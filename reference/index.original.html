@@ -1,0 +1,1043 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Breakout Monitor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: status bar with the saved-scan time and Refresh on top, signal counts, the two shortlists, the coin detail, then the full board. Same visual family as the Coin Zones Board. */
+:root{
+  --bg:#f3f5f8; --panel:#ffffff; --ink:#12202c; --muted:#586878; --line:#dce2e9; --soft:#eaeef3;
+  --up:#0d8a5c; --up-bg:#e3f4ec; --dn:#c0410f; --dn-bg:#fbe9df; --acc:#2557d6; --acc-bg:#e4ebfb;
+  --warn:#9a6700; --warn-bg:#fff3cd; --wk:#8a97a6;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --panel:#151d25; --ink:#e5ecf3; --muted:#92a3b4; --line:#26323d; --soft:#1c2630;
+  --up:#41d09a; --up-bg:#0f2d24; --dn:#ff9265; --dn-bg:#33211a; --acc:#7ba5ff; --acc-bg:#182643;
+  --warn:#f2c14e; --warn-bg:#33290f; --wk:#6b7a8a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --panel:#151d25; --ink:#e5ecf3; --muted:#92a3b4; --line:#26323d; --soft:#1c2630;
+  --up:#41d09a; --up-bg:#0f2d24; --dn:#ff9265; --dn-bg:#33211a; --acc:#7ba5ff; --acc-bg:#182643;
+  --warn:#f2c14e; --warn-bg:#33290f; --wk:#6b7a8a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:14px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:600;margin:0;text-wrap:balance}
+h3{font-size:12px;font-weight:600;margin:0;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+p{margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.note{color:var(--muted);font-size:12.5px;line-height:1.45}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:10px;min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.status{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;background:var(--soft);color:var(--muted);white-space:nowrap}
+.pill.up{background:var(--up-bg);color:var(--up)} .pill.dn{background:var(--dn-bg);color:var(--dn)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.acc{background:var(--acc-bg);color:var(--acc)}
+.btn{font:inherit;font-weight:500;padding:6px 16px;border-radius:999px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--acc)}
+.btn:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.prog{height:4px;border-radius:2px;background:var(--soft);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+.banner{border-radius:8px;padding:8px 12px;font-size:13px;background:var(--warn-bg);color:var(--warn)}
+.banner.ok{background:var(--up-bg);color:var(--up)} .banner.bad{background:var(--dn-bg);color:var(--dn)}
+.lede{color:var(--muted);line-height:1.55;max-width:70ch}
+.lede b{color:var(--ink);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.tile span{display:block;font-size:12px;color:var(--muted)}
+.tile b{display:block;font-family:var(--mono);font-size:24px;font-weight:500;margin-top:2px}
+.tile.up b{color:var(--up)} .tile.dn b{color:var(--dn)} .tile.coil b{color:var(--warn)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px}
+.scroll{overflow-x:auto}
+.tall{max-height:560px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:12px;position:sticky;top:0;background:var(--panel);z-index:1}
+td.r,th.r{text-align:right}
+td.why{white-space:normal;min-width:16rem;color:var(--muted);font-size:12.5px}
+tbody tr{cursor:pointer} tbody tr:hover td{background:var(--soft)} tbody tr.on td{background:var(--acc-bg)}
+th button{all:unset;cursor:pointer} th button:focus-visible{outline:2px solid var(--acc)}
+.bar{display:inline-flex;align-items:center;gap:6px}
+.bar i{display:inline-block;height:6px;border-radius:3px;background:currentColor;opacity:.75}
+.bar.up{color:var(--up)} .bar.dn{color:var(--dn)}
+.bar em{font-style:normal;color:var(--ink);font-family:var(--mono);min-width:2ch;text-align:right}
+.up{color:var(--up)} .dn{color:var(--dn)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:4px 11px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+.search{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;width:140px;margin-left:auto}
+.dhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.dhead h2{font-size:20px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;border-top:2px dashed;vertical-align:middle;margin-right:5px}
+.chart{position:relative;min-height:290px}
+.chart svg{display:block;width:100%}
+.chart text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 9px;font-size:12px;font-family:var(--mono);white-space:nowrap}
+.tip .k{color:var(--muted)}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.plan{border:1px solid var(--line);border-left-width:4px;border-radius:0 8px 8px 0;padding:10px 12px;display:grid;gap:3px}
+.plan.up{border-left-color:var(--up)} .plan.dn{border-left-color:var(--dn)}
+.plan h3{color:inherit}
+.plan.up h3,.plan.up .big{color:var(--up)} .plan.dn h3,.plan.dn .big{color:var(--dn)}
+.plan .k{color:var(--muted);font-size:12.5px}
+.plan b{font-family:var(--mono);font-weight:500}
+.big{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1.2}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.kv div{background:var(--soft);border-radius:8px;padding:6px 10px}
+.kv b{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kv span{font-family:var(--mono);font-size:14px}
+.whys{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.whys ul{margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.6}
+.method ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.6}
+.method b{color:var(--ink)}
+.empty{text-align:center;padding:28px 16px;display:grid;gap:8px;justify-items:center}
+@media (max-width:640px){.hide-sm{display:none}.search{margin-left:0}}
+@media (prefers-reduced-motion:reduce){.prog i{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="card">
+    <div class="top">
+      <div>
+        <h1>Breakout Radar</h1>
+        <p class="note">Your watch list of 35 coins plus two gauges, <b>TOTAL2ES</b> (the alt market cap without stablecoins, a gauge for the whole alt market) and <b>STABLE.C</b> (the total stablecoin market cap; a new index with history only from May 2025, so its weekly read rests on few candles), scored for an upcoming breakout or breakdown. Three stages: <b>8H</b> early warning, <b>1D</b> confirmation, <b>1W</b> trend filter.</p>
+      </div>
+      <div class="status">
+        <span class="pill" id="scanAt">No saved scan yet</span>
+        <span class="pill warn" id="stale" hidden>New daily candle since this scan</span>
+        <span class="pill" id="next8"></span>
+        <button class="btn" id="refresh" type="button" hidden>Refresh from TradingView</button>
+        <button class="btn ghost" id="quick" type="button" hidden>Quick 8H check</button>
+        <button class="btn ghost" id="missing" type="button" hidden>Fetch missing coins</button>
+      </div>
+    </div>
+    <div class="prog" id="progWrap" hidden><i id="prog"></i></div>
+    <p class="note" id="progText" hidden></p>
+    <div class="banner" id="banner" hidden></div>
+  </header>
+
+  <main id="main" class="wrap" style="max-width:none">
+    <section class="card empty">
+      <h2>Loading the last saved scan…</h2>
+      <p class="note">The radar shows the results of your last refresh. Nothing is pulled from TradingView until you press Refresh.</p>
+    </section>
+  </main>
+
+  <section class="card method">
+    <h2>How the radar works</h2>
+    <ul>
+      <li><b>Saved scans.</b> Opening the page shows the last saved scan and makes no TradingView calls. <b>Refresh</b> works <b>once a day</b>, after the 11am Sydney daily close, and then locks until the next one. It pulls 600 daily bars for each coin on your watch list, then 300 8H bars only for coins near a level (within 5% of a 1D level, on a watch list, coiling, plus BTC), plus 8H stablecoin dominance. Requests go one at a time <b>4.5 seconds apart</b>, about 55 in all (roughly 4 minutes; keep the page open). <b>If TradingView pauses access, the run stops straight away</b>, keeps what loaded, and locks every TradingView button until the pause ends, so nothing is retried. Each coin's exchange (Binance first, then Bybit, OKX, KuCoin, Gate, Bitget, MEXC) is found on first use and remembered. <b>Quick 8H check</b> (for the 7pm and 3am closes) works once per 8H candle; it keeps the day's 1D levels and pulls only the shortlist's 8H bars, about 15 to 20 requests. If a coin fails to load, it keeps its previous result and <b>Fetch missing coins</b> retries only those.</li>
+      <li><b>8H early warning.</b> A closed 8H candle (11am, 7pm and 3am Sydney) beyond the coin's 1D trigger level by at least a quarter of the 8H ATR, on volume at least 1.5× its 20-candle average, with 8H RSI on the breakout side of 50 and no RSI divergence into the break. Alt breakouts are held at <b>Weak</b> while stablecoin dominance (USDT.D + USDC.D) is breaking up. A break that closes back inside within two 8H candles is marked <b>Failed</b>. Only the last 24 hours count as fresh.</li>
+      <li><b>Stages.</b> Early (8H) is a heads-up; Confirmed is the 1D close through the level with daily RSI on the same side of 50; the 1W trend (weekly RSI above or below 50) shows whether the move runs with or against the bigger picture.</li>
+      <li><b>Levels.</b> When a triangle, wedge or flag is found, resistance and support are its trendlines projected to today; otherwise the nearest swing high above and swing low below the price. Weekly bars are built from the daily bars.</li>
+      <li><b>Scores (0–100).</b> Price near the level, a bullish or bearish pattern, a Bollinger squeeze, trend (EMA20/50/200), RSI, MACD histogram, volume, RSI divergence and strength vs BTC over 30 days. 60% daily, 40% weekly. <b>Watch</b> means 55+ and at least 15 points ahead of the other side. <b>Coiling</b> means a squeeze in the tightest 20% with no side ahead. <b>Broke out / down</b> means a daily close through the level in the last three closed bars that still holds.</li>
+      <li><b>Chance and days.</b> Every past daily close through a swing level in each coin's history is replayed: stop 1.5× ATR back through the level, target 3× ATR beyond it (2:1), 45 days allowed. Chance is how often the target came first, blended with the all-coin rate (weight of 10 cases). Days is the middle half of how long the winners took. A 2:1 trade breaks even at 33%.</li>
+      <li><b>Before acting,</b> wait for the daily close (11am Sydney), check volume, and prefer the retest. This is a screen, not financial advice.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  /* your fixed watch list (no screener): 35 coins plus two gauges: TOTAL2ES (alt market cap without stablecoins) and STABLE.C (total stablecoin market cap, a new index with history only from May 2025) */
+  const WATCH = [["btc", "BTC", "BINANCE:BTCUSDT"], ["eth", "ETH", "BINANCE:ETHUSDT"], ["bnb", "BNB", "BINANCE:BNBUSDT"], ["xrp", "XRP", "BINANCE:XRPUSDT"], ["sol", "SOL", "BINANCE:SOLUSDT"], ["trx", "TRX", "BINANCE:TRXUSDT"], ["zec", "ZEC", "BINANCE:ZECUSDT"], ["hype", "HYPE", "BYBIT:HYPEUSDT"], ["doge", "DOGE", "BINANCE:DOGEUSDT"], ["xmr", "XMR", "KUCOIN:XMRUSDT"], ["leo", "LEO", "OKX:LEOUSDT"], ["link", "LINK", "BINANCE:LINKUSDT"], ["ada", "ADA", "BINANCE:ADAUSDT"], ["xlm", "XLM", "BINANCE:XLMUSDT"], ["near", "NEAR", "BINANCE:NEARUSDT"], ["ltc", "LTC", "BINANCE:LTCUSDT"], ["uni", "UNI", "BINANCE:UNIUSDT"], ["avax", "AVAX", "BINANCE:AVAXUSDT"], ["sui", "SUI", "BINANCE:SUIUSDT"], ["xaut", "XAUT", null], ["tao", "TAO", "BINANCE:TAOUSDT"], ["shib", "SHIB", "BINANCE:SHIBUSDT"], ["ena", "ENA", "BINANCE:ENAUSDT"], ["pepe", "PEPE", "BINANCE:PEPEUSDT"], ["aave", "AAVE", "BINANCE:AAVEUSDT"], ["ondo", "ONDO", "BINANCE:ONDOUSDT"], ["pump", "PUMP", "BINANCE:PUMPUSDT"], ["aster", "ASTER", "BINANCE:ASTERUSDT"], ["wld", "WLD", "BINANCE:WLDUSDT"], ["icp", "ICP", "BINANCE:ICPUSDT"], ["jup", "JUP", "BINANCE:JUPUSDT"], ["render", "RENDER", "BINANCE:RENDERUSDT"], ["inj", "INJ", "BINANCE:INJUSDT"], ["lit", "LIT", "BYBIT:LITUSDT"], ["ray", "RAY", "BINANCE:RAYUSDT"], ["total2es", "TOTAL2ES", "CRYPTOCAP:TOTAL2ES"], ["stablec", "STABLE.C", "CRYPTOCAP:STABLE.C"]];
+  let COINS = WATCH.map((c) => c.slice());
+  const SERVERS = ['Trading View', 'Trading_View'];
+  const GAP_MS = 4500; /* 4.5 s between TradingView calls */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ---------- scoring engine (same as the earlier Breakout Radar) ---------- */
+  function scanAll(IN, LIST) {
+    const num = (x) => (x == null || !isFinite(x) ? null : x);
+    const ema = (a, p) => { const k = 2 / (p + 1); const o = []; let e = a[0]; for (let i = 0; i < a.length; i++) { e = i === 0 ? a[0] : a[i] * k + e * (1 - k); o.push(e); } return o; };
+    const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
+    const rsiOf = (c, p) => {
+      const o = new Array(c.length).fill(null); let g = 0, l = 0;
+      for (let i = 1; i < c.length; i++) {
+        const d = c[i] - c[i - 1], up = Math.max(d, 0), dn = Math.max(-d, 0);
+        if (i <= p) { g += up; l += dn; if (i === p) { g /= p; l /= p; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } }
+        else { g = (g * (p - 1) + up) / p; l = (l * (p - 1) + dn) / p; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); }
+      }
+      return o;
+    };
+    const atrOf = (h, l, c, p) => {
+      const o = []; let a = 0;
+      for (let i = 0; i < c.length; i++) {
+        const tr = i === 0 ? h[i] - l[i] : Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1]));
+        a = i < p ? (a * i + tr) / (i + 1) : (a * (p - 1) + tr) / p; o.push(a);
+      }
+      return o;
+    };
+    const slope = (pts) => {
+      const mx = mean(pts.map((p) => p.x)), my = mean(pts.map((p) => p.y));
+      let nu = 0, de = 0; for (const p of pts) { nu += (p.x - mx) * (p.y - my); de += (p.x - mx) ** 2; }
+      return de ? nu / de : 0;
+    };
+    const toBars = (rows) => {
+      const r = (Array.isArray(rows) ? rows : []).filter((x) => x && isFinite(+x.close) && +x.close > 0);
+      return { t: r.map((x) => x.date), o: r.map((x) => +x.open), h: r.map((x) => +x.high), l: r.map((x) => +x.low), c: r.map((x) => +x.close), v: r.map((x) => +x.volume || 0) };
+    };
+    const toWeeks = (b) => {
+      const w = { t: [], o: [], h: [], l: [], c: [], v: [] }; let key = null;
+      for (let i = 0; i < b.c.length; i++) {
+        const day = Math.floor(Date.parse(b.t[i]) / 864e5), k = day - ((day + 3) % 7);
+        if (k !== key) { key = k; w.t.push(b.t[i]); w.o.push(b.o[i]); w.h.push(b.h[i]); w.l.push(b.l[i]); w.c.push(b.c[i]); w.v.push(b.v[i]); }
+        else { const j = w.c.length - 1; w.h[j] = Math.max(w.h[j], b.h[i]); w.l[j] = Math.min(w.l[j], b.l[i]); w.c[j] = b.c[i]; w.v[j] += b.v[i]; }
+      }
+      return w;
+    };
+    const BULL = ['Ascending triangle', 'Falling wedge', 'Bull flag', 'Inverse H&S'];
+    const BEAR = ['Descending triangle', 'Rising wedge', 'Bear flag', 'Head & shoulders'];
+    const analyze = (b, tf) => {
+      const D = tf === '1D', n = b.c.length;
+      const P = D ? { L: 60, k: 3, near: 3, sq: 120, ema3: 200, min: 45, flag: 0.2 } : { L: 26, k: 2, near: 6, sq: 52, ema3: 0, min: 18, flag: 0.35 };
+      if (n < P.min) return null;
+      const L = Math.min(P.L, n - 8), s = n - 3 - L, e = n - 4, { h, l, c, v, o } = b;
+      const px = c[n - 1], atr = atrOf(h, l, c, 14)[n - 1];
+      const e20 = ema(c, 20), e50 = ema(c, 50), e200 = P.ema3 && n >= P.ema3 ? ema(c, 200) : null;
+      const rsi = rsiOf(c, 14), r = rsi[n - 1], r3 = rsi[n - 4];
+      const m12 = ema(c, 12), m26 = ema(c, 26), macd = c.map((_, i) => m12[i] - m26[i]), sig = ema(macd, 9);
+      const hist = macd.map((x, i) => x - sig[i]), hN = hist[n - 1], hP = hist[n - 2];
+      const crossUp = [1, 2, 3].some((j) => hist[n - j] > 0 && hist[n - j - 1] <= 0), crossDn = [1, 2, 3].some((j) => hist[n - j] < 0 && hist[n - j - 1] >= 0);
+      const bbw = [];
+      for (let i = 19; i < n; i++) { const w = c.slice(i - 19, i + 1), m = mean(w), sd = Math.sqrt(mean(w.map((x) => (x - m) ** 2))); bbw.push((4 * sd) / m); }
+      const look = bbw.slice(-P.sq), sqz = Math.round((100 * look.filter((x) => x <= look[look.length - 1]).length) / look.length);
+      const avg20 = mean(v.slice(Math.max(0, n - 22), n - 2)), volX = avg20 ? v[n - 2] / avg20 : null;
+      const dry = n > 55 ? mean(v.slice(n - 12, n - 2)) / mean(v.slice(n - 52, n - 2)) : null;
+      const pivots = (from) => {
+        const ph = [], pl = [];
+        for (let i = Math.max(P.k, from); i <= e - P.k + 2 && i < n - P.k; i++) {
+          let hi = true, lo = true;
+          for (let j = i - P.k; j <= i + P.k; j++) { if (h[j] > h[i]) hi = false; if (l[j] < l[i]) lo = false; }
+          if (hi) ph.push({ x: i, y: h[i] }); if (lo) pl.push({ x: i, y: l[i] });
+        }
+        return { ph, pl };
+      };
+      const { ph, pl } = pivots(s), far = pivots(n - 3 * L);
+      let pattern = 'No clear pattern', sloped = false, hiLine = null, loLine = null;
+      if (ph.length >= 2 && pl.length >= 2) {
+        const sH = slope(ph), sL = slope(pl), dH = (sH * L) / atr, dL = (sL * L) / atr, fl = (x) => Math.abs(x) < 2;
+        const base = c[Math.max(0, s - L)], prior = (c[s] - base) / base;
+        if (fl(dH) && fl(dL)) pattern = 'Range';
+        else if (fl(dH) && dL > 0) pattern = 'Ascending triangle';
+        else if (fl(dL) && dH < 0) pattern = 'Descending triangle';
+        else if (dH < 0 && dL > 0) pattern = 'Symmetrical triangle';
+        else if (dH > 0 && dL > 0) pattern = dL - dH > 2 ? 'Rising wedge' : prior < -P.flag ? 'Bear flag' : 'Rising channel';
+        else if (dH < 0 && dL < 0) pattern = dL - dH > 2 ? 'Falling wedge' : prior > P.flag ? 'Bull flag' : 'Falling channel';
+        else pattern = 'Broadening';
+        if (pattern === 'Range' || pattern === 'Symmetrical triangle' || pattern === 'Broadening') {
+          const lows = pl.slice(-3), highs = ph.slice(-3);
+          if (lows.length === 3 && lows[1].y < lows[0].y && lows[1].y < lows[2].y && Math.abs(lows[0].y - lows[2].y) < 1.5 * atr) pattern = 'Inverse H&S';
+          else if (highs.length === 3 && highs[1].y > highs[0].y && highs[1].y > highs[2].y && Math.abs(highs[0].y - highs[2].y) < 1.5 * atr) pattern = 'Head & shoulders';
+        }
+        sloped = !['Range', 'Inverse H&S', 'Head & shoulders', 'Broadening', 'Rising channel', 'Falling channel'].includes(pattern);
+        if (sloped) {
+          const fit = (pts, sl, top) => { const a = mean(pts.map((p) => p.y - sl * p.x)); const off = pts.map((p) => p.y - (a + sl * p.x)); return a + (top ? Math.max(...off) : Math.min(...off)); };
+          const useH = fl(dH) ? 0 : sH, useL = fl(dL) ? 0 : sL;
+          const aH = fit(ph, useH, true), aL = fit(pl, useL, false);
+          hiLine = (j) => aH + useH * j; loLine = (j) => aL + useL * j;
+        }
+      }
+      if (!hiLine) {
+        const above = far.ph.filter((p) => p.y > px * 1.003).map((p) => p.y), below = far.pl.filter((p) => p.y < px * 0.997).map((p) => p.y);
+        let wMax = -Infinity, wMin = Infinity; for (let i = s; i <= e; i++) { wMax = Math.max(wMax, h[i]); wMin = Math.min(wMin, l[i]); }
+        const R = above.length ? Math.min(...above) : wMax, S = below.length ? Math.max(...below) : wMin;
+        hiLine = () => R; loLine = () => S;
+      }
+      const res = hiLine(n - 1), sup = loLine(n - 1);
+      const tol = Math.max(0.015 * res, 0.5 * atr), tolS = Math.max(0.015 * Math.abs(sup), 0.5 * atr);
+      const tRes = far.ph.filter((p) => Math.abs(hiLine(p.x) - p.y) <= tol).length, tSup = far.pl.filter((p) => Math.abs(p.y - loLine(p.x)) <= tolS).length;
+      const pad = 0.2 * atr;
+      const upBar = [n - 4, n - 3, n - 2].find((j) => c[j] > hiLine(j) + pad && c[j - 1] <= hiLine(j - 1) + pad), dnBar = [n - 4, n - 3, n - 2].find((j) => c[j] < loLine(j) - pad && c[j - 1] >= loLine(j - 1) - pad);
+      const dRes = ((res - px) / px) * 100, dSup = ((px - sup) / px) * 100;
+      let status;
+      if (upBar != null) status = px > res ? (l[n - 1] <= res * 1.02 ? 'Retesting breakout' : 'Broke out') : 'Failed breakout';
+      else if (dnBar != null) status = px < sup ? (h[n - 1] >= sup * 0.98 ? 'Retesting breakdown' : 'Broke down') : 'Failed breakdown';
+      else if (px > res) status = 'Breaking out (bar open)';
+      else if (px < sup) status = 'Breaking down (bar open)';
+      else if (dRes <= P.near) status = 'Testing resistance';
+      else if (dSup <= P.near) status = 'Testing support';
+      else status = 'Mid-range';
+      let bo = 0, bd = 0; const wb = [], wd = [];
+      const up = (x, why) => { bo += x; if (why) wb.push(why); }, dn = (x, why) => { bd += x; if (why) wd.push(why); };
+      if (['Broke out', 'Retesting breakout', 'Breaking out (bar open)'].includes(status)) up(22, tf + ' ' + status.toLowerCase());
+      else if (dRes >= 0) { if (dRes <= P.near / 2) up(20, dRes.toFixed(1) + '% below ' + tf + ' resistance'); else if (dRes <= P.near) up(14, dRes.toFixed(1) + '% below ' + tf + ' resistance'); else if (dRes <= 2 * P.near) up(6); }
+      if (['Broke down', 'Retesting breakdown', 'Breaking down (bar open)'].includes(status)) dn(22, tf + ' ' + status.toLowerCase());
+      else if (dSup >= 0) { if (dSup <= P.near / 2) dn(20, dSup.toFixed(1) + '% above ' + tf + ' support'); else if (dSup <= P.near) dn(14, dSup.toFixed(1) + '% above ' + tf + ' support'); else if (dSup <= 2 * P.near) dn(6); }
+      if (status === 'Failed breakout') dn(10, tf + ' failed breakout');
+      if (status === 'Failed breakdown') up(10, tf + ' failed breakdown');
+      if (tRes >= 3) up(5, tf + ' resistance tested ' + tRes + '×');
+      if (tSup >= 3) dn(5, tf + ' support tested ' + tSup + '×');
+      if (sqz <= 20) { up(10, tf + ' squeeze'); dn(10, tf + ' squeeze'); } else if (sqz <= 35) { up(5); dn(5); }
+      if (BULL.includes(pattern)) up(15, tf + ' ' + pattern.toLowerCase());
+      if (BEAR.includes(pattern)) dn(15, tf + ' ' + pattern.toLowerCase());
+      const trendUp = px > e50[n - 1];
+      if (pattern === 'Symmetrical triangle') (trendUp ? up : dn)(6, tf + ' symmetrical triangle');
+      if (trendUp) up(5); else dn(5, tf + ' below EMA50');
+      if (e200) { if (px > e200[n - 1]) up(5); else dn(5, tf + ' below EMA200'); }
+      else if (px > e20[n - 1]) up(5); else dn(5);
+      if (e20[n - 1] > e50[n - 1]) up(5, tf + ' EMA20 > EMA50'); else dn(5, tf + ' EMA20 < EMA50');
+      if (r >= 50 && r < 70) up(8); else if (r >= 70) up(4, tf + ' RSI overbought'); else if (r > 30) dn(8); else dn(4, tf + ' RSI oversold');
+      if (r > r3) up(3); else dn(3);
+      if (hN > 0 && hN > hP) up(10, tf + ' MACD rising' + (crossUp ? ' (fresh cross)' : '')); else if (hN > 0) up(5);
+      if (hN < 0 && hN < hP) dn(10, tf + ' MACD falling' + (crossDn ? ' (fresh cross)' : '')); else if (hN < 0) dn(5);
+      if (dry != null && dry < 0.8) { up(3, tf + ' volume drying up'); dn(3); }
+      if (volX >= 1.5) { if (c[n - 2] >= o[n - 2]) up(5, tf + ' volume ' + volX.toFixed(1) + '× on green bar'); else dn(5, tf + ' volume ' + volX.toFixed(1) + '× on red bar'); }
+      if (n > 45) {
+        let a = n - 11, b2 = n - 41;
+        for (let i = n - 11; i <= n - 2; i++) if (c[i] < c[a]) a = i;
+        for (let i = n - 41; i <= n - 12; i++) if (c[i] < c[b2]) b2 = i;
+        if (c[a] < c[b2] && rsi[a] > rsi[b2] + 2) up(6, tf + ' bullish RSI divergence');
+        let a2 = n - 11, b3 = n - 41;
+        for (let i = n - 11; i <= n - 2; i++) if (c[i] > c[a2]) a2 = i;
+        for (let i = n - 41; i <= n - 12; i++) if (c[i] > c[b3]) b3 = i;
+        if (c[a2] > c[b3] && rsi[a2] < rsi[b3] - 2) dn(6, tf + ' bearish RSI divergence');
+      }
+      return {
+        px, res, sup, dRes, dSup, status, pattern, sqz, rsi: r, atr, tRes, tSup, volX,
+        macd: hN > 0 ? (hN > hP ? 'Rising' : 'Fading') : hN < 0 ? (hN < hP ? 'Falling' : 'Fading') : 'Flat',
+        ema50: e50[n - 1], ema200: e200 ? e200[n - 1] : null,
+        bo: Math.min(100, bo), bd: Math.min(100, bd), wb, wd,
+      };
+    };
+    const history = (b) => {
+      const { h, l, c, v } = b, n = c.length, atr = atrOf(h, l, c, 14), K = 3, LB = 120, HOLD = 45;
+      const out = { up: [], dn: [] };
+      let actH = [], actL = [], busyUp = -1, busyDn = -1;
+      for (let j = 30; j <= n - 2; j++) {
+        const p = j - 1 - K;
+        if (p >= K) {
+          let hi = true, lo = true;
+          for (let q = p - K; q <= p + K; q++) { if (h[q] > h[p]) hi = false; if (l[q] < l[p]) lo = false; }
+          if (hi && Math.max(...c.slice(p + 1, j)) <= h[p]) actH.push(p);
+          if (lo && Math.min(...c.slice(p + 1, j)) >= l[p]) actL.push(p);
+        }
+        actH = actH.filter((i) => i >= j - LB); actL = actL.filter((i) => i >= j - LB);
+        const a = atr[j - 1], avg = mean(v.slice(Math.max(0, j - 20), j)), volOk = avg > 0 && v[j] >= 1.5 * avg;
+        const trade = (dir, lvl) => {
+          const stop = dir > 0 ? lvl - 1.5 * a : lvl + 1.5 * a, tgt = dir > 0 ? lvl + 3 * a : lvl - 3 * a;
+          for (let k = j + 1; k < Math.min(n, j + 1 + HOLD); k++) {
+            const hitStop = dir > 0 ? l[k] <= stop : h[k] >= stop, hitTgt = dir > 0 ? h[k] >= tgt : l[k] <= tgt;
+            if (hitStop) return { win: false, days: k - j, vol: volOk, end: k };
+            if (hitTgt) return { win: true, days: k - j, vol: volOk, end: k };
+          }
+          return j + HOLD < n ? { win: false, days: HOLD, vol: volOk, end: j + HOLD, timeout: true } : null;
+        };
+        if (actH.length) {
+          const R = Math.min(...actH.map((i) => h[i]));
+          if (c[j] > R + 0.2 * a && c[j - 1] <= R + 0.2 * a && j > busyUp) { const t = trade(1, R); if (t) { out.up.push(t); busyUp = t.end; } }
+          actH = actH.filter((i) => h[i] > c[j]);
+        }
+        if (actL.length) {
+          const S = Math.max(...actL.map((i) => l[i]));
+          if (c[j] < S - 0.2 * a && c[j - 1] >= S - 0.2 * a && j > busyDn) { const t = trade(-1, S); if (t) { out.dn.push(t); busyDn = t.end; } }
+          actL = actL.filter((i) => l[i] < c[j]);
+        }
+      }
+      const sum = (ev) => {
+        const wins = ev.filter((e) => e.win), days = wins.map((e) => e.days).sort((x, y) => x - y), q = (f) => (days.length ? days[Math.min(days.length - 1, Math.floor(f * days.length))] : null);
+        const vev = ev.filter((e) => e.vol);
+        return { n: ev.length, wins: wins.length, d25: q(0.25), d50: q(0.5), d75: q(0.75), vn: vev.length, vwins: vev.filter((e) => e.win).length };
+      };
+      return { up: sum(out.up), dn: sum(out.dn) };
+    };
+    const bb = toBars(IN.btc), btc30 = bb.c.length > 31 ? bb.c[bb.c.length - 1] / bb.c[bb.c.length - 31] - 1 : null;
+    const out = [];
+    for (const [id, coin] of LIST) {
+      const b = toBars(IN[id]);
+      const d = analyze(b, '1D');
+      if (!d) continue;
+      const w = analyze(toWeeks(b), '1W') || null;
+      const n = b.c.length;
+      const rs = id !== 'btc' && btc30 != null && n > 31 ? (b.c[n - 1] / b.c[n - 31] - 1 - btc30) * 100 : null;
+      const wb = [...d.wb], wd = [...d.wd];
+      let dbo = d.bo, dbd = d.bd;
+      if (rs != null && rs > 0) { dbo += 5; wb.push('Beating BTC by ' + rs.toFixed(1) + '% (30D)'); }
+      if (rs != null && rs < 0) { dbd += 5; wd.push('Lagging BTC by ' + Math.abs(rs).toFixed(1) + '% (30D)'); }
+      const BO = Math.round(0.6 * Math.min(100, dbo) + 0.4 * (w ? w.bo : Math.min(100, dbo)));
+      const BD = Math.round(0.6 * Math.min(100, dbd) + 0.4 * (w ? w.bd : Math.min(100, dbd)));
+      let signal = 'Neutral';
+      if (d.status === 'Broke out' || d.status === 'Retesting breakout') signal = 'Broke out';
+      else if (d.status === 'Broke down' || d.status === 'Retesting breakdown') signal = 'Broke down';
+      else if (BO >= 55 && BO - BD >= 15) signal = 'Breakout watch';
+      else if (BD >= 55 && BD - BO >= 15) signal = 'Breakdown watch';
+      else if (d.sqz <= 20 || (w && w.sqz <= 20)) signal = 'Coiling';
+      if (w) { wb.push(...w.wb); wd.push(...w.wd); }
+      const H = history(b);
+      out.push({
+        coin, id, price: d.px, signal, breakout_score: BO, breakdown_score: BD,
+        d_status: d.status, d_pattern: d.pattern, d_res: d.res, d_res_pct: d.dRes, d_sup: d.sup, d_sup_pct: d.dSup,
+        w_status: w ? w.status : null, w_pattern: w ? w.pattern : null, w_res: w ? w.res : null, w_res_pct: w ? w.dRes : null, w_sup: w ? w.sup : null, w_sup_pct: w ? w.dSup : null,
+        d_squeeze: d.sqz, w_squeeze: w ? w.sqz : null, d_rsi: num(d.rsi), w_rsi: w ? num(w.rsi) : null, d_macd: d.macd, w_macd: w ? w.macd : null,
+        volume_x: num(d.volX), rs_btc_30d: rs, d_atr: d.atr, d_ema50: d.ema50, d_ema200: d.ema200,
+        breakout_trigger: d.res, breakout_stop: d.res - 1.5 * d.atr, breakdown_trigger: d.sup, breakdown_stop: d.sup + 1.5 * d.atr,
+        breakout_target: d.res + 3 * d.atr, breakdown_target: d.sup - 3 * d.atr,
+        bo_hist_n: H.up.n, bo_hist_wins: H.up.wins, bo_days_p25: H.up.d25, bo_days_median: H.up.d50, bo_days_p75: H.up.d75, bo_vol_n: H.up.vn, bo_vol_wins: H.up.vwins,
+        bd_hist_n: H.dn.n, bd_hist_wins: H.dn.wins, bd_days_p25: H.dn.d25, bd_days_median: H.dn.d50, bd_days_p75: H.dn.d75, bd_vol_n: H.dn.vn, bd_vol_wins: H.dn.vwins,
+        breakout_reasons: wb.join(' · '), breakdown_reasons: wd.join(' · '),
+      });
+    }
+    return out;
+
+  }
+  function summarize(scan) {
+    const n = (s) => scan.filter((r) => r.signal === s).length;
+    const tot = (k) => scan.reduce((s, r) => s + (r[k] || 0), 0), rate = (w, t) => (tot(t) ? tot(w) / tot(t) : null);
+    const e8 = (d) => scan.filter((r) => r.h8_kind === 'early' && r.h8_dir === d).length;
+    return { early_up: e8('up'), early_dn: e8('dn'), fail8: scan.filter((r) => r.h8_kind === 'fail').length, scanned: scan.length, breakout_watch: n('Breakout watch'), broke_out: n('Broke out'), coiling: n('Coiling'), breakdown_watch: n('Breakdown watch'), broke_down: n('Broke down'),
+      bo_pool_n: tot('bo_hist_n'), bo_pool_rate: rate('bo_hist_wins', 'bo_hist_n'), bo_vol_rate: rate('bo_vol_wins', 'bo_vol_n'),
+      bd_pool_n: tot('bd_hist_n'), bd_pool_rate: rate('bd_hist_wins', 'bd_hist_n'), bd_vol_rate: rate('bd_vol_wins', 'bd_vol_n') };
+  }
+  function addOdds(scan) {
+    const pool = (w, t) => { const T = scan.reduce((s, r) => s + (r[t] || 0), 0); return T ? scan.reduce((s, r) => s + (r[w] || 0), 0) / T : 0; };
+    const avgDays = (k, w) => { const rs = scan.filter((r) => r[k] != null && r[w] >= 3); const W = rs.reduce((s, r) => s + r[w], 0); return W ? Math.round(rs.reduce((s, r) => s + r[k] * r[w], 0) / W) : null; };
+    const pu = pool('bo_hist_wins', 'bo_hist_n'), pd = pool('bd_hist_wins', 'bd_hist_n');
+    const typ = { bo: [avgDays('bo_days_p25', 'bo_hist_wins'), avgDays('bo_days_median', 'bo_hist_wins'), avgDays('bo_days_p75', 'bo_hist_wins')], bd: [avgDays('bd_days_p25', 'bd_hist_wins'), avgDays('bd_days_median', 'bd_hist_wins'), avgDays('bd_days_p75', 'bd_hist_wins')] };
+    const days = (r, side) => (r[side + '_hist_wins'] >= 3 ? [r[side + '_days_p25'], r[side + '_days_median'], r[side + '_days_p75']] : typ[side]);
+    scan.forEach((r) => {
+      const u = days(r, 'bo'), d = days(r, 'bd');
+      r.breakout_chance = (r.bo_hist_wins + 10 * pu) / (r.bo_hist_n + 10); r.breakout_days = u[1]; r.breakout_days_range = u[0] != null ? u[0] + '–' + u[2] : null;
+      r.breakdown_chance = (r.bd_hist_wins + 10 * pd) / (r.bd_hist_n + 10); r.breakdown_days = d[1]; r.breakdown_days_range = d[0] != null ? d[0] + '–' + d[2] : null;
+    });
+    return scan;
+  }
+
+  /* ---------- formatting ---------- */
+  const fmtP = (p) => { if (p == null || !isFinite(p)) return '–'; const a = Math.abs(p); if (a >= 1000) return p.toLocaleString('en-US', { maximumFractionDigits: 0 }); if (a >= 100) return p.toFixed(1); if (a >= 10) return p.toFixed(2); if (a >= 1) return p.toFixed(3); if (a >= 0.01) return p.toFixed(4); return p.toPrecision(4); };
+  const pct = (x) => (x == null || !isFinite(x) ? '–' : (x > 0 ? '+' : '') + x.toFixed(1) + '%');
+  const dist = (x) => (x == null || !isFinite(x) ? '–' : x < 0 ? 'through' : x.toFixed(1) + '%');
+  const chance = (x) => (x == null || !isFinite(x) ? '–' : Math.round(x * 100) + '%');
+  const sigCls = (s) => (s === 'Breakout watch' || s === 'Broke out' ? 'up' : s === 'Breakdown watch' || s === 'Broke down' ? 'dn' : s === 'Coiling' ? 'warn' : '');
+  const when = (iso) => { const t = new Date(iso); return t.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); };
+  const ago = (iso) => { const m = (Date.now() - Date.parse(iso)) / 6e4; if (m < 1) return 'just now'; if (m < 60) return Math.round(m) + ' min ago'; if (m < 48 * 60) return Math.round(m / 60) + ' h ago'; return Math.round(m / 1440) + ' days ago'; };
+
+  /* ---------- 8H early-warning tier ----------
+     Early = a closed 8H candle beyond the coin's 1D trigger level by at least 0.25x 8H ATR(14), volume >= 1.5x the 20-bar average,
+     8H RSI on the breakout side of 50, no RSI divergence into the break, and stablecoin dominance not breaking up (for breakouts).
+     Failed = the break closed back inside within the next two 8H candles. Only the last three closed 8H candles (24 h) count as fresh. */
+  const H8 = 8 * 3600;
+  const T8 = (() => {
+    const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
+    const rsiOf = (c, p) => {
+      const o = new Array(c.length).fill(null); let g = 0, l = 0;
+      for (let i = 1; i < c.length; i++) {
+        const d = c[i] - c[i - 1], up = Math.max(d, 0), dn = Math.max(-d, 0);
+        if (i <= p) { g += up; l += dn; if (i === p) { g /= p; l /= p; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } }
+        else { g = (g * (p - 1) + up) / p; l = (l * (p - 1) + dn) / p; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); }
+      }
+      return o;
+    };
+    const atrOf = (h, l, c, p) => {
+      const o = []; let a = 0;
+      for (let i = 0; i < c.length; i++) {
+        const tr = i === 0 ? h[i] - l[i] : Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1]));
+        a = i < p ? (a * i + tr) / (i + 1) : (a * (p - 1) + tr) / p; o.push(a);
+      }
+      return o;
+    };
+    /* keep closed candles only: drop any bar whose 8 hours have not finished */
+    const closed = (b, span) => {
+      if (!b || !Array.isArray(b.t)) return null;
+      const now = Date.now() / 1000; let n = b.t.length;
+      while (n > 0 && b.t[n - 1] + span > now) n--;
+      const k = ['t', 'o', 'h', 'l', 'c', 'v'], o = {}; k.forEach((x) => { o[x] = (b[x] || []).slice(0, n).map(Number); });
+      return o;
+    };
+    const divergence = (c, R, n, dir) => {
+      if (n < 45) return false;
+      let a = n - 11, b = n - 41;
+      if (dir > 0) { for (let i = n - 11; i <= n - 1; i++) if (c[i] > c[a]) a = i; for (let i = n - 41; i <= n - 12; i++) if (c[i] > c[b]) b = i; return c[a] > c[b] && R[a] < R[b] - 2; }
+      for (let i = n - 11; i <= n - 1; i++) if (c[i] < c[a]) a = i; for (let i = n - 41; i <= n - 12; i++) if (c[i] < c[b]) b = i; return c[a] < c[b] && R[a] > R[b] + 2;
+    };
+    function coin(raw, row, dom) {
+      const b = closed(raw, H8);
+      if (!b || b.c.length < 60) return { h8_state: 'No 8H data', h8_kind: 'none', h8_dir: '' };
+      const { h, l, c, v } = b, n = c.length, A = atrOf(h, l, c, 14)[n - 1], R = rsiOf(c, 14), r = R[n - 1], px = c[n - 1];
+      const res = row.d_res, sup = row.d_sup;
+      const volAt = (j) => { const a = mean(v.slice(Math.max(0, j - 20), j)); return a ? v[j] / a : null; };
+      const find = (dir, lvl) => {
+        if (lvl == null || !isFinite(lvl)) return null;
+        const beyond = (j) => (dir > 0 ? c[j] > lvl + 0.25 * A : c[j] < lvl - 0.25 * A);
+        for (let j = n - 3; j <= n - 1; j++) {
+          if (j < 1 || !beyond(j) || beyond(j - 1)) continue;
+          const back = c.slice(j + 1, j + 3).some((x) => (dir > 0 ? x < lvl : x > lvl));
+          return { j, ago: n - 1 - j, vx: volAt(j), back };
+        }
+        return null;
+      };
+      const up = find(1, res), dn = find(-1, sup);
+      const pick = up && dn ? (up.j >= dn.j ? 'up' : 'dn') : up ? 'up' : dn ? 'dn' : null;
+      const out = {
+        h8_close: px, h8_rsi: r, h8_atr: A, h8_at: new Date((b.t[n - 1] + H8) * 1000).toISOString(),
+        h8_up_trig: res != null ? res + 0.25 * A : null, h8_dn_trig: sup != null ? sup - 0.25 * A : null,
+        h8_res_atr: res != null ? (res - px) / A : null, h8_sup_atr: sup != null ? (px - sup) / A : null,
+        h8_vol_x: volAt(n - 1), h8_ago: null, h8_why: '', h8_dir: '', h8_kind: 'none', h8_state: 'Inside range',
+      };
+      if (pick) {
+        const U = pick === 'up', br = U ? up : dn, lvl = U ? res : sup;
+        out.h8_dir = pick; out.h8_ago = br.ago; out.h8_vol_x = br.vx; out.h8_level = lvl;
+        if (br.back) { out.h8_kind = 'fail'; out.h8_state = U ? 'Failed breakout' : 'Failed breakdown'; out.h8_why = 'Closed back ' + (U ? 'below' : 'above') + ' ' + fmtP(lvl) + ' within two 8H candles. Often a signal the other way.'; return out; }
+        const miss = [], ok = [];
+        if (br.vx != null && br.vx >= 1.5) ok.push('volume ' + br.vx.toFixed(1) + '×'); else miss.push('volume only ' + (br.vx == null ? '–' : br.vx.toFixed(1)) + '× (needs 1.5×)');
+        if (U ? r > 50 : r < 50) ok.push('8H RSI ' + r.toFixed(0)); else miss.push('8H RSI ' + r.toFixed(0) + ' on the wrong side of 50');
+        if (divergence(c, R, n, U ? 1 : -1)) miss.push(U ? 'bearish RSI divergence into the break' : 'bullish RSI divergence into the break'); else ok.push('no divergence');
+        const coinIsBtc = row.id === 'btc';
+        if (dom && dom.up) { if (U && !coinIsBtc) miss.push('stablecoin dominance breaking up'); if (!U) ok.push('stablecoin dominance breaking up adds weight'); }
+        else if (dom && dom.down && U) ok.push('stablecoin dominance falling');
+        const strong = miss.length === 0;
+        out.h8_kind = strong ? 'early' : 'weak';
+        out.h8_state = (strong ? 'Early ' : 'Weak ') + (U ? 'breakout' : 'breakdown');
+        out.h8_why = (miss.length ? 'Missing: ' + miss.join(', ') + '. ' : '') + (ok.length ? 'Has: ' + ok.join(', ') + '.' : '');
+        return out;
+      }
+      if (res != null && px > res + 0.25 * A) { out.h8_kind = 'beyond'; out.h8_dir = 'up'; out.h8_state = 'Above 1D level'; out.h8_why = 'Broke above more than 24 h ago; see the 1D status.'; }
+      else if (sup != null && px < sup - 0.25 * A) { out.h8_kind = 'beyond'; out.h8_dir = 'dn'; out.h8_state = 'Below 1D level'; out.h8_why = 'Broke below more than 24 h ago; see the 1D status.'; }
+      else if (out.h8_res_atr != null && out.h8_res_atr <= 0.5 && (out.h8_sup_atr == null || out.h8_res_atr <= out.h8_sup_atr)) { out.h8_kind = 'near'; out.h8_dir = 'up'; out.h8_state = 'Pressing resistance'; out.h8_why = 'Within half an 8H ATR of ' + fmtP(res) + '. An 8H close above ' + fmtP(out.h8_up_trig) + ' starts the early warning.'; }
+      else if (out.h8_sup_atr != null && out.h8_sup_atr <= 0.5) { out.h8_kind = 'near'; out.h8_dir = 'dn'; out.h8_state = 'Pressing support'; out.h8_why = 'Within half an 8H ATR of ' + fmtP(sup) + '. An 8H close below ' + fmtP(out.h8_dn_trig) + ' starts the early warning.'; }
+      return out;
+    }
+    /* USDT.D + USDC.D summed; breaking up = an 8H close in the last 24 h above the prior 10-day high (or a daily close above the prior 20-day high) */
+    function dominance(a, b) {
+      const A = closed(a, H8), B = closed(b, H8);
+      if (!A || !B || A.c.length < 60 || B.c.length < 60) return null;
+      const mb = new Map(B.t.map((t, i) => [t, i])), S = { t: [], h: [], l: [], c: [] };
+      A.t.forEach((t, i) => { const j = mb.get(t); if (j == null) return; S.t.push(t); S.h.push(A.h[i] + B.h[j]); S.l.push(A.l[i] + B.l[j]); S.c.push(A.c[i] + B.c[j]); });
+      const n = S.c.length; if (n < 60) return null;
+      const at = atrOf(S.h, S.l, S.c, 14)[n - 1], R = rsiOf(S.c, 14);
+      const hi = Math.max(...S.h.slice(n - 33, n - 3)), lo = Math.min(...S.l.slice(n - 33, n - 3));
+      const up8 = S.c.slice(n - 3).some((x) => x > hi + 0.25 * at), dn8 = S.c.slice(n - 3).some((x) => x < lo - 0.25 * at);
+      const D = { h: [], l: [], c: [] }; let key = null, cnt = 0;
+      S.t.forEach((t, i) => { const k = Math.floor(t / 86400); if (k !== key) { if (key != null && cnt < 3) { D.h.pop(); D.l.pop(); D.c.pop(); } key = k; cnt = 0; D.h.push(S.h[i]); D.l.push(S.l[i]); D.c.push(S.c[i]); } else { const m = D.c.length - 1; D.h[m] = Math.max(D.h[m], S.h[i]); D.l[m] = Math.min(D.l[m], S.l[i]); D.c[m] = S.c[i]; } cnt++; });
+      if (cnt < 3) { D.h.pop(); D.l.pop(); D.c.pop(); }
+      const m = D.c.length; let up1 = false, dn1 = false, dhi = null, dlo = null;
+      if (m > 22) { dhi = Math.max(...D.h.slice(m - 21, m - 1)); dlo = Math.min(...D.l.slice(m - 21, m - 1)); up1 = D.c[m - 1] > dhi; dn1 = D.c[m - 1] < dlo; }
+      return { value: S.c[n - 1], chg24: S.c[n - 1] - S.c[n - 4], rsi: R[n - 1], hi8: hi, lo8: lo, hi1: dhi, lo1: dlo, up8, dn8, up1, dn1, up: up8 || up1, down: (dn8 || dn1) && !(up8 || up1), at: new Date((S.t[n - 1] + H8) * 1000).toISOString() };
+    }
+    return { coin, dominance };
+  })();
+  /* staged ladder: 8H early -> 1D confirmed -> 1W trend */
+  function stage(r) {
+    const wUp = r.w_rsi != null ? r.w_rsi >= 50 : null;
+    let s = '', dir = '';
+    if (r.signal === 'Broke out') { dir = 'up'; s = r.d_rsi >= 50 ? 'Confirmed' : '1D break, weak momentum'; }
+    else if (r.signal === 'Broke down') { dir = 'dn'; s = r.d_rsi < 50 ? 'Confirmed' : '1D break, weak momentum'; }
+    else if (r.h8_kind === 'early') { dir = r.h8_dir; s = 'Early'; }
+    else if (r.h8_kind === 'fail') { dir = r.h8_dir; s = 'Failed'; }
+    else if (r.h8_kind === 'weak') { dir = r.h8_dir; s = 'Weak 8H break'; }
+    const trend = wUp == null ? '' : wUp ? '1W trend up' : '1W trend down';
+    const withTrend = dir && wUp != null ? (dir === 'up') === wUp : null;
+    return { s, dir, trend, withTrend };
+  }
+
+  /* ---------- state ---------- */
+  let SNAP = null, BARS = {}, PICK = 'BTC', VIEW = 'all', QUERY = '', SORT = { k: 'breakout_score', dir: -1 };
+  let DB = null, MCP = null, SERVER = null, CAN_WRITE = false, RUNNING = false, PAUSE_UNTIL = 0;
+
+  /* ---------- rendering ---------- */
+  function bar(v, side) { return `<span class="bar ${side}"><i style="width:${Math.max(2, Math.round((v || 0) * 0.6))}px"></i><em>${v == null ? '–' : v}</em></span>`; }
+  function render() {
+    if (!SNAP || !SNAP.rows || !SNAP.rows.length) {
+      $('main').innerHTML = `<section class="card empty"><h2>No saved scan yet</h2><p class="note">${CAN_WRITE ? 'Press <b>Refresh from TradingView</b> to run the first scan. It takes 5 to 7 minutes and is saved for next time.' : 'The owner of this page has not run a scan yet.'}</p></section>`;
+      return;
+    }
+    const rows = SNAP.rows, S = SNAP.summary;
+    const btc = rows.find((r) => r.coin === 'BTC');
+    let h = `<section class="card"><p class="lede">Of the <b>${S.scanned}</b> coins scanned, <b>${S.breakout_watch}</b> are set up to break out and <b>${S.breakdown_watch}</b> to break down; <b>${S.coiling}</b> more are coiling in a squeeze with no side picked yet. Bitcoin reads <b>${esc(btc ? btc.signal.toLowerCase() : 'not scanned')}</b>.
+      Looking back over each coin's last ~600 days, a close through a swing level hit a 2:1 target before its stop <b>${chance(S.bo_pool_rate)}</b> of the time for breakouts (${S.bo_pool_n} cases, <b>${chance(S.bo_vol_rate)}</b> with 1.5× volume) and <b>${chance(S.bd_pool_rate)}</b> for breakdowns (${S.bd_pool_n} cases). A 2:1 trade breaks even at 33%.</p></section>`;
+    h += `<section class="tiles">
+      <div class="tile up"><span>Breakout watch</span><b>${S.breakout_watch}</b></div>
+      <div class="tile up"><span>Broke out (1D, last 3 bars)</span><b>${S.broke_out}</b></div>
+      <div class="tile coil"><span>Coiling (squeeze)</span><b>${S.coiling}</b></div>
+      <div class="tile up"><span>8H early breakout</span><b>${S.early_up ?? '–'}</b></div>
+      <div class="tile dn"><span>8H early breakdown</span><b>${S.early_dn ?? '–'}</b></div>
+      <div class="tile dn"><span>Breakdown watch</span><b>${S.breakdown_watch}</b></div>
+      <div class="tile dn"><span>Broke down (1D, last 3 bars)</span><b>${S.broke_down}</b></div></section>`;
+    h += market(SNAP.dom) + early(rows);
+    const top = (side) => {
+      const key = side === 'up' ? 'breakout_score' : 'breakdown_score', done = side === 'up' ? 'Broke out' : 'Broke down';
+      const list = rows.filter((r) => r.signal !== done).sort((a, b) => b[key] - a[key]).slice(0, 8);
+      return list.map((r) => `<tr data-coin="${esc(r.coin)}" class="${r.coin === PICK ? 'on' : ''}"><td><b>${esc(r.coin)}</b></td><td>${bar(r[key], side)}</td><td class="r num">${dist(side === 'up' ? r.d_res_pct : r.d_sup_pct)}</td><td class="r num">${chance(side === 'up' ? r.breakout_chance : r.breakdown_chance)}</td><td class="r num">${esc((side === 'up' ? r.breakout_days_range : r.breakdown_days_range) || '–')}</td><td class="why hide-sm">${esc((side === 'up' ? r.breakout_reasons : r.breakdown_reasons) || '–')}</td></tr>`).join('');
+    };
+    h += `<section class="two">
+      <div class="card"><h2>Closest to breaking out</h2><p class="note">Highest breakout scores that haven't broken out yet. Chance is how often past breakouts hit a 2:1 target before the stop; days is the typical time it took.</p>
+        <div class="scroll"><table><thead><tr><th>Coin</th><th>Score</th><th class="r">To trigger</th><th class="r">Chance</th><th class="r">Days</th><th class="hide-sm">Why</th></tr></thead><tbody>${top('up')}</tbody></table></div></div>
+      <div class="card"><h2>Closest to breaking down</h2><p class="note">Highest breakdown scores that haven't broken down yet. Chance and days work the same way, for moves down.</p>
+        <div class="scroll"><table><thead><tr><th>Coin</th><th>Score</th><th class="r">To trigger</th><th class="r">Chance</th><th class="r">Days</th><th class="hide-sm">Why</th></tr></thead><tbody>${top('dn')}</tbody></table></div></div></section>`;
+    h += detail(rows.find((r) => r.coin === PICK) || rows[0]);
+    h += board(rows);
+    $('main').innerHTML = h;
+    drawChart(rows.find((r) => r.coin === PICK) || rows[0]);
+  }
+
+
+  const kindCls = (r) => (r.h8_kind === 'early' || r.h8_kind === 'weak' || r.h8_kind === 'near' || r.h8_kind === 'beyond' ? (r.h8_dir === 'up' ? 'up' : 'dn') : r.h8_kind === 'fail' ? 'warn' : '');
+  const agoTxt = (k) => (k == null ? '–' : k === 0 ? 'last close' : (8 * k) + ' h ago');
+  function market(d) {
+    if (!d) return `<section class="card"><h2>Market filter</h2><p class="note">Stablecoin dominance (USDT.D + USDC.D) has not been loaded yet. Press Refresh to add it.</p></section>`;
+    const st = d.up ? ['Breaking up', 'dn', 'Money is moving into stablecoins. Alt breakouts are not promoted to Early while this lasts, and breakdowns get extra weight.']
+      : d.down ? ['Breaking down', 'up', 'Money is leaving stablecoins, which supports alt breakouts.'] : ['Quiet', '', 'No break in either direction, so it does not hold back any signal.'];
+    const f = (x) => (x == null ? '–' : x.toFixed(2) + '%');
+    return `<section class="card"><div class="dhead"><h2>Market filter</h2><span class="pill ${st[1]}">Stablecoin dominance ${esc(st[0])}</span></div>
+      <p class="lede">USDT.D + USDC.D is <b>${f(d.value)}</b> (${d.chg24 >= 0 ? '+' : ''}${d.chg24.toFixed(2)} pts in 24 h, 8H RSI ${d.rsi.toFixed(0)}). ${esc(st[2])}</p>
+      <div class="kv"><div><b>8H 10-day high</b><span>${f(d.hi8)}${d.up8 ? ' · broken' : ''}</span></div><div><b>8H 10-day low</b><span>${f(d.lo8)}${d.dn8 ? ' · broken' : ''}</span></div>
+      <div><b>1D 20-day high</b><span>${f(d.hi1)}${d.up1 ? ' · broken' : ''}</span></div><div><b>1D 20-day low</b><span>${f(d.lo1)}${d.dn1 ? ' · broken' : ''}</span></div></div></section>`;
+  }
+  function early(rows) {
+    const ord = { early: 0, fail: 1, weak: 2, near: 3 };
+    const list = rows.filter((r) => ord[r.h8_kind] != null).sort((a, b) => ord[a.h8_kind] - ord[b.h8_kind] || (a.h8_ago ?? 9) - (b.h8_ago ?? 9));
+    const has8 = rows.some((r) => r.h8_kind != null);
+    let h = `<section class="card"><h2>8H early warnings</h2><p class="note">Fresh 8H closes through each coin's 1D trigger level in the last 24 hours, plus coins pressing a level. Early is a heads-up, not a buy: wait for the 1D close to confirm, and refine entries on the 4H.</p>`;
+    if (!has8) return h + `<p class="note">This scan was saved before the 8H tier existed. Press Refresh to add it.</p></section>`;
+    if (!list.length) return h + `<p class="note">No 8H breaks or coins pressing a level right now.</p></section>`;
+    h += `<div class="scroll"><table><thead><tr><th>Coin</th><th>8H signal</th><th class="r">1D level</th><th class="r">8H close</th><th class="r">Vol ×</th><th class="r">RSI 8H</th><th>When</th><th class="hide-sm">1D status</th><th class="hide-sm">1W</th><th class="hide-sm">Why</th></tr></thead><tbody>`;
+    for (const r of list) {
+      const lvl = r.h8_dir === 'up' ? r.d_res : r.d_sup;
+      h += `<tr data-coin="${esc(r.coin)}" class="${r.coin === PICK ? 'on' : ''}"><td><b>${esc(r.coin)}</b></td><td><span class="pill ${kindCls(r)}">${esc(r.h8_state)}</span></td><td class="r num">${fmtP(lvl)}</td><td class="r num">${fmtP(r.h8_close)}</td>
+        <td class="r num">${r.h8_vol_x == null ? '–' : r.h8_vol_x.toFixed(1) + '×'}</td><td class="r num">${r.h8_rsi == null ? '–' : r.h8_rsi.toFixed(0)}</td><td>${r.h8_kind === 'near' ? '–' : agoTxt(r.h8_ago)}</td>
+        <td class="hide-sm">${esc(r.d_status || '–')}</td><td class="hide-sm">${r.w_rsi == null ? '–' : r.w_rsi >= 50 ? '<span class="up">up</span>' : '<span class="dn">down</span>'}</td><td class="why hide-sm">${esc(r.h8_why || '')}</td></tr>`;
+    }
+    return h + '</tbody></table></div></section>';
+  }
+  function detail(r) {
+    const staleNote = r.stale_at ? `<span class="pill warn">kept from ${esc(when(r.stale_at))}; this coin failed to load on the last refresh</span>` : '';
+    const li = (s) => { const a = (s || '').split(' · ').filter(Boolean); return (a.length ? a : ['Nothing pointing this way right now']).map((t) => `<li>${esc(t)}</li>`).join(''); };
+    const plan = (side) => {
+      const up = side === 'up';
+      return `<div class="plan ${side}"><h3>${up ? 'If it breaks out' : 'If it breaks down'}</h3>
+        <p><span class="k">Early warning</span> 8H close ${up ? 'above' : 'below'} <b>${fmtP(up ? r.h8_up_trig : r.h8_dn_trig)}</b> <span class="k">on 1.5× volume</span></p>
+        <p><span class="k">Trigger</span> daily close ${up ? 'above' : 'below'} <b>${fmtP(up ? r.breakout_trigger : r.breakdown_trigger)}</b></p>
+        <p><span class="k">Target (2:1)</span> <b>${fmtP(up ? r.breakout_target : r.breakdown_target)}</b> <span class="k">· stop</span> <b>${fmtP(up ? r.breakout_stop : r.breakdown_stop)}</b></p>
+        <p class="big">${chance(up ? r.breakout_chance : r.breakdown_chance)} <span class="k">chance it plays out</span></p>
+        <p><span class="k">Usually within</span> <b>${esc((up ? r.breakout_days_range : r.breakdown_days_range) || '–')}</b> <span class="k">days (median ${esc((up ? r.breakout_days : r.breakdown_days) ?? '–')})</span></p>
+        <p class="note">On this coin ${up ? r.bo_hist_wins : r.bd_hist_wins} of ${up ? r.bo_hist_n : r.bd_hist_n} past ${up ? 'breakouts' : 'breakdowns'} hit the target first; with 1.5× volume, ${up ? r.bo_vol_wins : r.bd_vol_wins} of ${up ? r.bo_vol_n : r.bd_vol_n}.</p></div>`;
+    };
+    return `<section class="card" id="detail">
+      <div class="dhead"><h2>${esc(r.coin)}</h2><span class="num">${fmtP(r.price)}</span><span class="pill ${sigCls(r.signal)}">${esc(r.signal)}</span>${(() => { const g = stage(r); return g.s ? `<span class="pill ${g.dir === 'up' ? 'up' : g.dir === 'dn' ? 'dn' : ''}">Stage: ${esc(g.s)} ${g.dir === 'up' ? '↑' : g.dir === 'dn' ? '↓' : ''}${g.withTrend === false ? ' · against 1W trend' : ''}</span>` : ''; })()}${staleNote}<span class="note">daily candles, last 120 days · tap any coin in a table to switch</span></div>
+      <div class="legend"><span><i style="color:var(--up)"></i>1D resistance</span><span><i style="color:var(--dn)"></i>1D support</span><span><i style="color:var(--wk)"></i>1W levels</span></div>
+      <div class="chart" id="chart"></div>
+      <div class="plans">${plan('up')}${plan('dn')}</div>
+      <div class="kv">
+        <div><b>8H signal</b><span>${esc(r.h8_state || '–')}</span></div><div><b>8H RSI · vol</b><span>${r.h8_rsi == null ? '–' : r.h8_rsi.toFixed(0)} · ${r.h8_vol_x == null ? '–' : r.h8_vol_x.toFixed(1) + '×'}</span></div>
+        <div><b>1D pattern</b><span>${esc(r.d_pattern || '–')}</span></div><div><b>1D status</b><span>${esc(r.d_status || '–')}</span></div>
+        <div><b>1W pattern</b><span>${esc(r.w_pattern || '–')}</span></div><div><b>1W status</b><span>${esc(r.w_status || '–')}</span></div>
+        <div><b>1W resistance</b><span>${fmtP(r.w_res)}</span></div><div><b>1W support</b><span>${fmtP(r.w_sup)}</span></div>
+        <div><b>Squeeze 1D / 1W</b><span>${r.d_squeeze ?? '–'} / ${r.w_squeeze ?? '–'}</span></div><div><b>RSI 1D / 1W</b><span>${r.d_rsi == null ? '–' : r.d_rsi.toFixed(0)} / ${r.w_rsi == null ? '–' : r.w_rsi.toFixed(0)}</span></div>
+        <div><b>MACD 1D / 1W</b><span>${esc(r.d_macd || '–')} / ${esc(r.w_macd || '–')}</span></div><div><b>Volume vs 20D avg</b><span>${r.volume_x == null ? '–' : r.volume_x.toFixed(1) + '×'}</span></div>
+      </div>
+      ${r.h8_why ? `<p class="note"><b>8H:</b> ${esc(r.h8_why)}</p>` : ''}
+      <p class="note">Squeeze is a percentile of Bollinger Band width over the past year: low means tight.</p>
+      <div class="whys"><div><h3 class="up">Breakout case · score ${r.breakout_score}</h3><ul>${li(r.breakout_reasons)}</ul></div><div><h3 class="dn">Breakdown case · score ${r.breakdown_score}</h3><ul>${li(r.breakdown_reasons)}</ul></div></div>
+    </section>`;
+  }
+
+  const COLS = [['coin', 'Coin'], ['price', 'Price', 'r'], ['signal', 'Signal'], ['h8_state', '8H'], ['breakout_score', 'Breakout'], ['breakdown_score', 'Breakdown'], ['breakout_chance', 'Up chance', 'r'], ['breakdown_chance', 'Down chance', 'r'],
+    ['d_pattern', '1D pattern', 'hide-sm'], ['d_status', '1D status', 'hide-sm'], ['d_res_pct', 'To 1D res.', 'r'], ['d_sup_pct', 'To 1D sup.', 'r'], ['w_pattern', '1W pattern', 'hide-sm'], ['d_squeeze', 'Squeeze', 'r hide-sm'], ['d_rsi', 'RSI 1D', 'r hide-sm'], ['volume_x', 'Vol ×', 'r hide-sm'], ['rs_btc_30d', 'vs BTC 30D', 'r hide-sm']];
+  const VIEWS = [['all', 'All'], ['Breakout watch', 'Breakout watch'], ['Broke out', 'Broke out'], ['Coiling', 'Coiling'], ['Breakdown watch', 'Breakdown watch'], ['Broke down', 'Broke down']];
+  function board(rows) {
+    const list = rows.filter((r) => (VIEW === 'all' || r.signal === VIEW) && (!QUERY || r.coin.includes(QUERY))).sort((a, b) => {
+      const A = a[SORT.k], B = b[SORT.k]; if (A == null) return 1; if (B == null) return -1;
+      return (typeof A === 'number' ? A - B : String(A).localeCompare(String(B))) * SORT.dir;
+    });
+    let h = `<section class="card" id="board"><h2>All coins</h2><div class="chips">${VIEWS.map((v) => `<button class="chip" data-view="${esc(v[0])}" aria-pressed="${VIEW === v[0]}">${v[1]}</button>`).join('')}<input class="search" id="q" type="search" placeholder="Find coin" aria-label="Find coin" value="${esc(QUERY)}"></div>`;
+    h += `<div class="scroll tall"><table><thead><tr>${COLS.map((c) => `<th class="${c[2] || ''}"${SORT.k === c[0] ? ` aria-sort="${SORT.dir > 0 ? 'ascending' : 'descending'}"` : ''}><button data-sort="${c[0]}">${c[1]}${SORT.k === c[0] ? (SORT.dir > 0 ? ' ↑' : ' ↓') : ''}</button></th>`).join('')}</tr></thead><tbody>`;
+    for (const r of list) {
+      h += `<tr data-coin="${esc(r.coin)}" class="${r.coin === PICK ? 'on' : ''}"><td><b>${esc(r.coin)}</b>${r.stale_at ? ' <span class="pill warn">old</span>' : ''}</td><td class="r num">${fmtP(r.price)}</td><td><span class="pill ${sigCls(r.signal)}">${esc(r.signal)}</span></td><td><span class="pill ${kindCls(r)}">${esc(r.h8_state || '–')}</span></td><td>${bar(r.breakout_score, 'up')}</td><td>${bar(r.breakdown_score, 'dn')}</td>
+        <td class="r num">${chance(r.breakout_chance)}</td><td class="r num">${chance(r.breakdown_chance)}</td><td class="hide-sm">${esc(r.d_pattern || '–')}</td><td class="hide-sm">${esc(r.d_status || '–')}</td>
+        <td class="r num">${dist(r.d_res_pct)}</td><td class="r num">${dist(r.d_sup_pct)}</td><td class="hide-sm">${esc(r.w_pattern || '–')}</td><td class="r num hide-sm">${r.d_squeeze ?? '–'}</td><td class="r num hide-sm">${r.d_rsi == null ? '–' : r.d_rsi.toFixed(0)}</td>
+        <td class="r num hide-sm">${r.volume_x == null ? '–' : r.volume_x.toFixed(1) + '×'}</td><td class="r num hide-sm ${r.rs_btc_30d > 0 ? 'up' : r.rs_btc_30d < 0 ? 'dn' : ''}">${r.coin === 'BTC' ? '–' : pct(r.rs_btc_30d)}</td></tr>`;
+    }
+    if (!list.length) h += `<tr><td colspan="${COLS.length}" class="note">No coins match this filter.</td></tr>`;
+    return h + '</tbody></table></div></section>';
+  }
+
+  function drawChart(r) {
+    const box = $('chart'); if (!box || !r) return;
+    const bars = (BARS[r.id] || []).slice(-120);
+    if (!bars.length) { box.innerHTML = '<p class="note">No chart saved for this coin yet. It appears after the next refresh.</p>'; return; }
+    const W = Math.max(300, box.clientWidth), H = 290, mt = 10, mb = 22, ml = 6, mr = 64;
+    const lv = [[r.d_res, 'var(--up)', 1.5], [r.d_sup, 'var(--dn)', 1.5], [r.w_res, 'var(--wk)', 1], [r.w_sup, 'var(--wk)', 1]].filter((l) => l[0] != null && isFinite(l[0]));
+    let lo = Infinity, hi = -Infinity; bars.forEach((b) => { lo = Math.min(lo, b[3]); hi = Math.max(hi, b[2]); });
+    const span = hi - lo, keep = lv.filter((l) => l[0] > lo - span * 0.6 && l[0] < hi + span * 0.6);
+    keep.forEach((l) => { lo = Math.min(lo, l[0]); hi = Math.max(hi, l[0]); });
+    const pad = (hi - lo) * 0.04 || 1; lo -= pad; hi += pad;
+    const y = (v) => mt + (hi - v) / (hi - lo) * (H - mt - mb), step = (W - ml - mr) / bars.length, bw = Math.max(1, step * 0.65);
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(r.coin)} daily candles with levels">`;
+    for (let i = 0; i <= 4; i++) { const v = lo + (hi - lo) * i / 4, yy = y(v).toFixed(1); s += `<line x1="${ml}" x2="${W - mr}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${W - mr + 6}" y="${(+yy + 4).toFixed(1)}">${fmtP(v)}</text>`; }
+    bars.forEach((b, i) => {
+      const x = ml + i * step + step / 2, upc = b[4] >= b[1], col = upc ? 'var(--up)' : 'var(--dn)';
+      s += `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${y(b[2]).toFixed(1)}" y2="${y(b[3]).toFixed(1)}" stroke="${col}"/>`;
+      s += `<rect x="${(x - bw / 2).toFixed(1)}" width="${bw.toFixed(1)}" y="${y(Math.max(b[1], b[4])).toFixed(1)}" height="${Math.max(1, Math.abs(y(b[1]) - y(b[4]))).toFixed(1)}" fill="${col}"/>`;
+      if (i > 0 && b[0].slice(5, 7) !== bars[i - 1][0].slice(5, 7)) s += `<text x="${x.toFixed(1)}" y="${H - 6}">${new Date(b[0] + 'T00:00:00Z').toLocaleString('en', { month: 'short', timeZone: 'UTC' })}</text>`;
+    });
+    keep.forEach((l) => { const yy = y(l[0]).toFixed(1); s += `<line x1="${ml}" x2="${W - mr}" y1="${yy}" y2="${yy}" stroke="${l[1]}" stroke-width="${l[2]}" stroke-dasharray="5 4"/>`; });
+    s += `<line id="hl" y1="${mt}" y2="${H - mb}" stroke="var(--muted)" stroke-opacity=".5" visibility="hidden"/><rect id="hit" x="${ml}" y="${mt}" width="${W - ml - mr}" height="${H - mt - mb}" fill="transparent"/></svg><div class="tip" id="tip" hidden></div>`;
+    box.innerHTML = s;
+    const svg = box.querySelector('svg'), tip = $('tip'), hl = $('hl');
+    $('hit').addEventListener('pointermove', (e) => {
+      const rect = svg.getBoundingClientRect(), px = (e.clientX - rect.left) * (W / rect.width), i = Math.max(0, Math.min(bars.length - 1, Math.floor((px - ml) / step))), b = bars[i], cx = ml + i * step + step / 2;
+      hl.setAttribute('x1', cx); hl.setAttribute('x2', cx); hl.setAttribute('visibility', 'visible');
+      tip.hidden = false; tip.innerHTML = `<div class="k">${esc(new Date(b[0] + 'T00:00:00Z').toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }))}</div><div>O ${fmtP(b[1])}  H ${fmtP(b[2])}</div><div>L ${fmtP(b[3])}  C ${fmtP(b[4])}</div>`;
+      const sx = cx / W * rect.width, tw = tip.offsetWidth; tip.style.left = Math.max(0, Math.min(rect.width - tw, sx + 12)) + 'px'; tip.style.top = '8px';
+    });
+    $('hit').addEventListener('pointerleave', () => { tip.hidden = true; hl.setAttribute('visibility', 'hidden'); });
+  }
+
+  function renderStatus() {
+    const at = SNAP && SNAP.at;
+    const at8 = SNAP && SNAP.at8 && SNAP.at8 !== at ? SNAP.at8 : null;
+    $('scanAt').textContent = at ? `Full scan ${when(at)} · ${ago(at)}` + (at8 ? ` · 8H check ${ago(at8)}` : '') : 'No saved scan yet';
+    $('scanAt').className = 'pill ' + (at ? 'acc' : '');
+    const lastClose = new Date(); lastClose.setUTCHours(0, 0, 0, 0);
+    const last8 = Math.floor(Date.now() / 1000 / H8) * H8 * 1000;
+    const oldDay = at && Date.parse(at) < lastClose.getTime(), old8 = at && Date.parse((SNAP && SNAP.at8) || at) < last8;
+    $('stale').hidden = !(oldDay || old8);
+    $('stale').textContent = oldDay ? 'New daily candle since this scan' : 'New 8H candle since this scan';
+    const nx = new Date(last8 + H8 * 1000);
+    $('next8').textContent = 'Next 8H close ' + nx.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const paused = PAUSE_UNTIL > Date.now();
+    const dayDone = refreshedToday(), h8Done = checked8Now();
+    const nextDay = new Date(lastClose.getTime() + 864e5);
+    const hm = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    $('refresh').hidden = !(CAN_WRITE && MCP);
+    $('refresh').disabled = RUNNING || paused || dayDone;
+    $('refresh').textContent = paused ? 'TradingView paused' : dayDone ? `Refreshed today · next ${hm(nextDay)}` : 'Refresh from TradingView';
+    $('quick').hidden = !(CAN_WRITE && MCP && SNAP && SNAP.rows && SNAP.rows.length);
+    $('quick').disabled = RUNNING || paused || h8Done;
+    $('quick').textContent = h8Done ? `8H checked · next ${hm(nx)}` : 'Quick 8H check';
+    const miss = SNAP && SNAP.failed ? SNAP.failed.length : 0;
+    $('missing').hidden = !(CAN_WRITE && MCP && miss && !RUNNING);
+    $('missing').disabled = paused;
+    $('missing').textContent = `Fetch ${miss} missing coin${miss === 1 ? '' : 's'}`;
+    if (paused && !RUNNING && $('banner').hidden) banner(`TradingView paused this account's access. Refresh is locked until ${new Date(PAUSE_UNTIL).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} so no more calls count against you.`, 'bad');
+  }
+  /* once-a-day and once-per-8H locks, from the saved scan times */
+  function refreshedToday() { const c = new Date(); c.setUTCHours(0, 0, 0, 0); const at = SNAP && SNAP.at; return !!at && Date.parse(at) >= c.getTime() && !listChanged(); }
+  function checked8Now() { const l8 = Math.floor(Date.now() / 1000 / H8) * H8 * 1000; const t = SNAP && (SNAP.at8 || SNAP.at); return !!t && Date.parse(t) >= l8; }
+  function banner(text, kind) { const b = $('banner'); b.hidden = !text; b.textContent = text || ''; b.className = 'banner ' + (kind || ''); }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-coin]');
+    if (tr) { PICK = tr.dataset.coin; render(); const d = $('detail'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const v = e.target.closest('[data-view]'); if (v) { VIEW = v.dataset.view; render(); return; }
+    const so = e.target.closest('[data-sort]');
+    if (so) { const k = so.dataset.sort; SORT = SORT.k === k ? { k, dir: -SORT.dir } : { k, dir: ['coin', 'signal', 'h8_state', 'd_pattern', 'd_status', 'w_pattern', 'd_res_pct', 'd_sup_pct', 'd_squeeze'].includes(k) ? 1 : -1 }; render(); }
+  });
+  document.addEventListener('input', (e) => {
+    if (e.target.id !== 'q') return;
+    QUERY = e.target.value.trim().toUpperCase(); const pos = e.target.selectionStart; render();
+    const q = $('q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); }
+  });
+  let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (SNAP) drawChart((SNAP.rows || []).find((r) => r.coin === PICK)); }, 150); });
+
+  /* ---------- TradingView refresh ---------- */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const FIX = {
+    needs_reauth: 'TradingView needs reconnecting. Reconnect it in claude.ai Settings → Connectors, then press Refresh again.',
+    server_not_connected: 'TradingView is not connected for you. Add it in claude.ai Settings → Connectors, then press Refresh again.',
+    selection_required: 'You have more than one TradingView connector. Choose one when claude.ai asks, then press Refresh again.',
+    approval_required: 'TradingView access needs your approval. Press Refresh again and allow it when asked.',
+    not_in_manifest: 'TradingView access is turned off for this page. Turn it on in the page permissions, then press Refresh again.',
+    blocked_by_policy: 'Your organization blocks this TradingView tool.',
+  };
+  /* one TradingView tool call, trying both connector spellings */
+  async function callTV(tool, args) {
+    let lastErr = null;
+    for (let i = 0; i < SERVERS.length; i++) {
+      const name = SERVER || SERVERS[i];
+      try {
+        const res = await MCP.callTool(name, tool, args, { cache: false });
+        SERVER = name;
+        let p = res.payload; if (typeof p === 'string') { try { p = JSON.parse(p); } catch (e) { /* keep text */ } }
+        return p;
+      } catch (e) {
+        lastErr = e;
+        if (!SERVER && (e.code === 'server_not_connected' || e.code === 'not_in_manifest' || e.code === 'server_not_found') && i < SERVERS.length - 1) continue;
+        break;
+      }
+    }
+    throw lastErr;
+  }
+  async function fetchRaw(sym, interval, count) {
+    const p = await callTV('mcp-tv-get-ohlcv', { symbol: sym, interval, count, format: 'columns' });
+    if (!p || p.success === false || !p.bars || !Array.isArray(p.bars.t)) throw { code: 'tool_error', message: (p && (p.error || p.message)) || 'TradingView returned no bars' };
+    return p.bars;
+  }
+  const toDaily = (b) => b.t.map((t, k) => ({ date: new Date(t * 1000).toISOString().slice(0, 10), open: b.o[k], high: b.h[k], low: b.l[k], close: b.c[k], volume: b.v[k] }));
+  const fetch8 = (sym) => fetchRaw(sym, '480', 300);
+  const isQuota = (e) => /quota|suspend|suspicion|too many|rate/i.test(String(e && e.message)) || (e && e.code === 'rate_limited');
+  const QUOTA_MSG = 'TradingView paused this account\'s access, so the run stopped straight away instead of retrying. Everything that loaded is saved. Refresh stays locked until the pause ends.';
+  /* when the pause ends: the time TradingView names (e.g. "until 00:00 UTC"), otherwise 30 minutes */
+  function pauseEnd(e) {
+    const m = /until\s+(\d{1,2}):(\d{2})\s*UTC/i.exec(String(e && e.message));
+    if (m) { const d = new Date(); d.setUTCHours(+m[1], +m[2], 0, 0); if (d.getTime() <= Date.now()) d.setUTCDate(d.getUTCDate() + 1); return d.getTime(); }
+    return Date.now() + 30 * 60000;
+  }
+  async function notePause(e) {
+    PAUSE_UNTIL = Math.max(PAUSE_UNTIL, pauseEnd(e));
+    try { await DB.doc('meta/pause').set({ until: PAUSE_UNTIL, why: String(e && e.message || '').slice(0, 300), at: new Date().toISOString() }); } catch (x) { /* lock still holds for this tab */ }
+  }
+  /* one pull: retries a temporary outage once; on a TradingView throttle it stops at once (no retries) */
+  async function pull(fn, sym) {
+    try { return { data: await fn(sym) }; }
+    catch (e0) {
+      let e = e0;
+      if (e && e.code === 'server_unavailable' && e.retryable) { await sleep(4000 + Math.random() * 2000); try { return { data: await fn(sym) }; } catch (e2) { e = e2; } }
+      if (FIX[e && e.code]) return { err: e, fatal: FIX[e.code] };
+      if (isQuota(e)) { await notePause(e); return { err: e, fatal: QUOTA_MSG }; }
+      return { err: e };
+    }
+  }
+
+  /* ---------- coin universe: top 100 by market cap from the TradingView coin screener ---------- */
+  const EXTRAS = ['LDO'];
+  const EXCLUDE = new Set(['USDT', 'USDC', 'DAI', 'USDE', 'USDS', 'FDUSD', 'PYUSD', 'USD1', 'TUSD', 'USDD', 'BUSD', 'RLUSD', 'USDF', 'USDG', 'USDTB', 'GHO', 'FRAX', 'LUSD', 'EURC', 'EURS', 'USDX', 'USDY', 'USDO', 'USDB', 'USD0', 'SUSDE', 'SUSDS', 'BUIDL', 'USYC', 'OUSG', 'USTB', 'BFUSD', 'USDAI', 'XAUT', 'PAXG', 'KAU', 'WBTC', 'WETH', 'STETH', 'WSTETH', 'WEETH', 'EETH', 'CBBTC', 'CBETH', 'RETH', 'METH', 'WBETH', 'SOLVBTC', 'LBTC', 'JITOSOL', 'BNSOL', 'MSOL', 'JUPSOL', 'CLBTC', 'BTCB', 'TBTC', 'RSETH', 'EZETH', 'SAVAX', 'STHYPE', 'KHYPE', 'WHYPE', 'WBNB', 'WTRX', 'BSCUSD', 'BSC-USD', 'FBTC', 'UNIBTC', 'PUMPBTC', 'OSETH', 'LSETH', 'SWETH', 'ETHX', 'SFRXETH', 'FRXETH', 'BBTC', 'WAVAX', 'WSOL', 'BGB']);
+  const EX_FALLBACK = ['BINANCE', 'BYBIT', 'OKX', 'KUCOIN', 'GATEIO', 'BITGET', 'MEXC'];
+  const DEFAULT_MAP = Object.fromEntries(WATCH.filter((c) => c[2]).map((c) => [c[1], c[2]]));
+  const WATCH_IDS = new Set(WATCH.map((c) => c[0]));
+  const LIST_V = 'watch-1'; /* bump when the watch list changes: allows one extra refresh that day */
+  const listChanged = () => !SNAP || SNAP.list !== LIST_V;
+  let SYMMAP = { map: {}, miss: {} };
+  async function universe() {
+    const p = await callTV('mcp-tv-run-screener', { market: 'coin', filters: { market_cap_calc: [5e7, null] }, sort_by: 'market_cap_calc', sort_order: 'desc', limit: 170, columns: ['name', 'close', 'market_cap_calc', 'High.3M', 'Low.3M'] });
+    const rows = p && p.data && Array.isArray(p.data.rows) ? p.data.rows : null;
+    if (!rows || !rows.length) throw { code: 'tool_error', message: (p && (p.error || p.message)) || 'The screener returned no coins' };
+    const seen = new Set(), out = [];
+    for (const r of rows) {
+      const base = String(r.name || '').toUpperCase().replace(/USD$/, '');
+      if (!base || seen.has(base) || EXCLUDE.has(base)) continue;
+      const c = +r.close, hi = +r['High.3M'], lo = +r['Low.3M'];
+      if (c > 0.9 && c < 1.1 && hi < 1.1 && lo > 0.9) continue; /* any dollar-pegged token the list missed */
+      seen.add(base); out.push(base);
+      if (out.length >= 100) break;
+    }
+    EXTRAS.forEach((b) => { if (!seen.has(b)) out.push(b); });
+    return out;
+  }
+  const idOf = (base) => base.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  /* daily pull for one coin, finding its exchange on first use and remembering it */
+  async function pullDaily(base) {
+    const known = SYMMAP.map[base] || DEFAULT_MAP[base];
+    const fresh = (b) => b && b.t.length >= 45 && b.t[b.t.length - 1] * 1000 > Date.now() - 4 * 864e5;
+    if (known) {
+      const r = await pull((s) => fetchRaw(s, '1D', 600), known);
+      if (r.data && fresh(r.data)) { SYMMAP.map[base] = known; return { sym: known, data: toDaily(r.data) }; }
+      if (r.fatal) return r;
+      const gone = (r.data && !fresh(r.data)) || /invalid symbol|symbol_error|no bars/i.test(String(r.err && r.err.message));
+      if (!gone) return r; /* a temporary error: keep the pair and retry next time */
+    }
+    if (known && known.startsWith('CRYPTOCAP:')) return { err: { message: 'index did not load' } };
+    if (SYMMAP.miss[base] && Date.now() - SYMMAP.miss[base] < 7 * 864e5) return { err: { message: 'no exchange pair found (checked within 7 days)' }, nomap: true };
+    for (const ex of EX_FALLBACK) {
+      const sym = ex + ':' + base + 'USDT';
+      if (sym === known) continue;
+      await sleep(GAP_MS);
+      const r = await pull((s) => fetchRaw(s, '1D', 600), sym);
+      if (r.fatal) return r;
+      if (r.data && fresh(r.data)) { SYMMAP.map[base] = sym; delete SYMMAP.miss[base]; return { sym, data: toDaily(r.data) }; }
+    }
+    SYMMAP.miss[base] = Date.now(); delete SYMMAP.map[base];
+    return { err: { message: 'no exchange pair found' }, nomap: true };
+  }
+  /* coins worth an 8H look: on a watch or broken signal, coiling, within 5% of a 1D level, or BTC */
+  const needs8 = (r) => r.id === 'btc' || ['Breakout watch', 'Breakdown watch', 'Broke out', 'Broke down', 'Coiling'].includes(r.signal) || (r.d_res_pct != null && r.d_res_pct <= 5) || (r.d_sup_pct != null && r.d_sup_pct <= 5);
+  const SKIP8 = { h8_state: 'Not checked (far from levels)', h8_kind: 'skip', h8_dir: '', h8_why: 'More than 5% from both 1D levels and on no watch list, so the 8H was not pulled to save TradingView calls.' };
+
+  async function pullDominance() {
+    const G = {};
+    for (const [k, sym] of [['usdt', 'CRYPTOCAP:USDT.D'], ['usdc', 'CRYPTOCAP:USDC.D']]) {
+      $('progText').textContent = 'Loading stablecoin dominance (8H)…';
+      const r = await pull(fetch8, sym);
+      if (r.data) G[k] = r.data; else if (r.fatal) return { G, fatal: r.fatal };
+      await sleep(GAP_MS);
+    }
+    return { G };
+  }
+  function startRun() { RUNNING = true; renderStatus(); banner(''); $('progWrap').hidden = false; $('progText').hidden = false; $('prog').style.width = '0'; }
+  function endRun() { RUNNING = false; $('progWrap').hidden = true; $('progText').hidden = true; $('prog').style.width = '0'; renderStatus(); }
+  const setProg = (f) => { $('prog').style.width = Math.round(100 * Math.min(1, f)) + '%'; };
+
+  /* full refresh: screener -> 1D for every coin -> 8H for the shortlist -> score and save. `only` limits it to listed coin ids (Fetch missing). */
+  async function run(only) {
+    if (RUNNING || !MCP || !DB) return;
+    if (PAUSE_UNTIL > Date.now()) { renderStatus(); return; }
+    if (!only && refreshedToday()) { banner('Already refreshed today. The next full refresh opens after the 11am Sydney daily close.', ''); return; }
+    startRun();
+    let stopped = null, targets;
+    try {
+      const s = await DB.doc('meta/symmap').get(); if (s.exists) { const d = s.data(); SYMMAP = { map: d.map || {}, miss: d.miss || {} }; }
+    } catch (e) { /* first run */ }
+    if (only) targets = COINS.filter((c) => only.includes(c[0]));
+    else targets = WATCH.map((c) => [c[0], c[1], SYMMAP.map[c[1]] || c[2] || null]);
+    if (!targets.some((t) => t[0] === 'btc')) targets.unshift(['btc', 'BTC', 'BINANCE:BTCUSDT']);
+    const IN = {}, B8 = {}, failed = [], miss8 = [], dropped = [];
+    const dom = await pullDominance(); if (dom.fatal) stopped = dom.fatal;
+    for (let i = 0; i < targets.length && !stopped; i++) {
+      const t = targets[i];
+      $('progText').textContent = `Loading ${t[1]} daily (${i + 1} of ${targets.length})…`;
+      const d = await pullDaily(t[1]);
+      if (d.data) { IN[t[0]] = d.data; t[2] = d.sym; }
+      else if (d.fatal) { stopped = d.fatal; failed.push(...targets.slice(i).map((x) => x[0])); break; }
+      else if (d.nomap) dropped.push(t[1]);
+      else failed.push(t[0]);
+      setProg(0.75 * (i + 1) / targets.length);
+      if (i < targets.length - 1) await sleep(GAP_MS);
+    }
+    const universeList = targets.filter((t) => t[2] && (IN[t[0]] || failed.includes(t[0])));
+    try { await DB.doc('meta/symmap').set({ map: SYMMAP.map, miss: SYMMAP.miss, at: new Date().toISOString() }); } catch (e) { /* only cache */ }
+    /* score 1D/1W first to choose the 8H shortlist */
+    const got = Object.keys(IN);
+    let pre = [];
+    if (got.length) { const btcIn = IN.btc || (BARS.btc ? BARS.btc.map((b) => ({ date: b[0], open: b[1], high: b[2], low: b[3], close: b[4], volume: 0 })) : null); const IN2 = Object.assign({}, IN); if (btcIn) IN2.btc = btcIn; pre = scanAll(IN2, universeList.filter((t) => IN[t[0]]).map((t) => [t[0], t[1]])); }
+    const short = pre.filter(needs8);
+    for (let i = 0; i < short.length && !stopped; i++) {
+      const r = short[i], t = universeList.find((x) => x[0] === r.id);
+      $('progText').textContent = `Loading ${r.coin} 8H (${i + 1} of ${short.length}, shortlist)…`;
+      const e = await pull(fetch8, t[2]);
+      if (e.data) B8[r.id] = e.data;
+      else { miss8.push(r.id); if (e.fatal) { stopped = e.fatal; miss8.push(...short.slice(i + 1).map((x) => x.id)); break; } }
+      setProg(0.75 + 0.25 * (i + 1) / short.length);
+      if (i < short.length - 1) await sleep(GAP_MS);
+    }
+    if (got.length || (dom.G.usdt && dom.G.usdc)) {
+      $('progText').textContent = 'Scoring and saving…';
+      try { await save(IN, failed, B8, miss8, dom.G, only ? null : universeList, new Set(short.map((r) => r.id))); }
+      catch (e) { stopped = stopped || 'Scored the coins but could not save the snapshot. Press Refresh again in a moment.'; }
+    }
+    endRun();
+    const m8 = miss8.filter((id) => !failed.includes(id));
+    if (stopped) banner(stopped, 'bad');
+    else if (failed.length || m8.length) banner(`${got.length} coins updated.` + (failed.length ? ` ${failed.length} did not load (${failed.map((id) => id.toUpperCase()).join(', ')}); they keep their previous result.` : '') + (m8.length ? ` 8H bars missing for ${m8.map((id) => id.toUpperCase()).join(', ')}.` : '') + ' Press Fetch missing coins to retry them.', '');
+    else banner(`${got.length} coins updated on 1D and 1W; ${short.length} near a level also checked on 8H. Saved.` + (dropped.length ? ` Skipped (no exchange pair on TradingView): ${dropped.join(', ')}.` : ''), 'ok');
+  }
+
+  /* quick 8H check: keeps the day's 1D levels, pulls 8H only for the shortlist plus dominance */
+  async function quick8() {
+    if (RUNNING || !MCP || !DB || !SNAP || !SNAP.rows) return;
+    if (PAUSE_UNTIL > Date.now()) { renderStatus(); return; }
+    if (checked8Now()) { banner('This 8H candle is already checked. The next check opens at the next 8H close.', ''); return; }
+    startRun();
+    let stopped = null;
+    const dom = await pullDominance(); if (dom.fatal) stopped = dom.fatal;
+    const domV = dom.G.usdt && dom.G.usdc ? T8.dominance(dom.G.usdt, dom.G.usdc) : SNAP.dom || null;
+    const rows = SNAP.rows.filter((r) => WATCH_IDS.has(r.id)).map((r) => Object.assign({}, r));
+    const short = rows.filter(needs8), symOf = Object.fromEntries((SNAP.coins || COINS).map((c) => [c[0], c[2]]));
+    let ok = 0; const miss = [];
+    for (let i = 0; i < short.length && !stopped; i++) {
+      const r = short[i];
+      $('progText').textContent = `Loading ${r.coin} 8H (${i + 1} of ${short.length})…`;
+      const e = await pull(fetch8, symOf[r.id] || DEFAULT_MAP[r.coin]);
+      if (e.data) {
+        Object.assign(r, T8.coin(e.data, r, domV));
+        if (r.h8_close != null) { r.price = r.h8_close; r.d_res_pct = ((r.d_res - r.price) / r.price) * 100; r.d_sup_pct = ((r.price - r.d_sup) / r.price) * 100; }
+        ok++;
+      } else { miss.push(r.coin); if (e.fatal) { stopped = e.fatal; break; } }
+      setProg((i + 1) / short.length);
+      if (i < short.length - 1) await sleep(GAP_MS);
+    }
+    const shortIds = new Set(short.map((r) => r.id));
+    rows.forEach((r) => { if (!shortIds.has(r.id)) Object.assign(r, SKIP8); });
+    try {
+      const doc = Object.assign({}, SNAP, { at8: new Date().toISOString(), dom: domV, summary: summarize(rows), rows: undefined });
+      await writeScan(doc, rows);
+      SNAP = Object.assign({}, doc, { rows }); render();
+    } catch (e) { stopped = stopped || 'Checked the 8H but could not save it. Press Quick 8H check again.'; }
+    endRun();
+    if (stopped) banner(stopped, 'bad');
+    else banner(`8H checked for ${ok} coins near a level` + (miss.length ? `; missing ${miss.join(', ')}` : '') + '. 1D levels are from the last full refresh.', miss.length ? '' : 'ok');
+  }
+
+  /* rows are stored in chunks so 100 coins stay under the per-document size limit */
+  const ROWCH = 4, BARCH = 6;
+  async function writeScan(meta, rows) {
+    const parts = Array.from({ length: ROWCH }, () => []);
+    rows.forEach((r, i) => parts[i % ROWCH].push(r));
+    for (let k = 0; k < ROWCH; k++) await DB.doc('scanrows/c' + k).set({ rows: parts[k], at: meta.at, at8: meta.at8 || null });
+    const head = Object.assign({}, meta); delete head.rows; head.chunked = ROWCH; head.order = rows.map((r) => r.id);
+    await DB.doc('scan/latest').set(head);
+  }
+  async function readScan(head) {
+    if (!head) return null;
+    if (!head.chunked) return head;
+    const all = [];
+    for (let k = 0; k < head.chunked; k++) { try { const s = await DB.doc('scanrows/c' + k).get(); if (s.exists) all.push(...(s.data().rows || [])); } catch (e) { /* skip */ } }
+    const pos = new Map((head.order || []).map((id, i) => [id, i]));
+    all.sort((a, b) => (pos.get(a.id) ?? 999) - (pos.get(b.id) ?? 999));
+    return Object.assign({}, head, { rows: all });
+  }
+
+  async function save(IN, failed, B8, miss8, G, universeList, shortIds) {
+    const prev = SNAP && SNAP.rows ? SNAP.rows : [], prevAt = SNAP && SNAP.at;
+    if (universeList) COINS = universeList.map((t) => [t[0], t[1], t[2]]);
+    const list = COINS.filter((c) => IN[c[0]]).map((c) => [c[0], c[1]]);
+    const btcFresh = !!IN.btc;
+    if (!btcFresh && BARS.btc) IN.btc = BARS.btc.map((b) => ({ date: b[0], open: b[1], high: b[2], low: b[3], close: b[4], volume: 0 }));
+    const dom = G.usdt && G.usdc ? T8.dominance(G.usdt, G.usdc) : (SNAP && SNAP.dom) || null;
+    const fresh = list.length ? scanAll(IN, list) : [];
+    fresh.forEach((r) => Object.assign(r, B8[r.id] ? T8.coin(B8[r.id], r, dom) : shortIds.has(r.id) ? { h8_state: 'No 8H data', h8_kind: 'none', h8_dir: '' } : SKIP8));
+    const byCoin = new Map(prev.map((r) => [r.id, r]));
+    fresh.forEach((r) => { delete r.stale_at; byCoin.set(r.id, r); });
+    failed.forEach((id) => { const old = byCoin.get(id); if (old && !old.stale_at) old.stale_at = prevAt; });
+    const rows = COINS.map((c) => byCoin.get(c[0])).filter(Boolean);
+    rows.forEach((r) => { delete r.breakout_chance; delete r.breakdown_chance; });
+    addOdds(rows);
+    const at = new Date().toISOString();
+    const missing = COINS.filter((c) => !byCoin.has(c[0]) || failed.includes(c[0]) || miss8.includes(c[0])).map((c) => c[0]);
+    rows.forEach((r) => { r.breakout_reasons = (r.breakout_reasons || '').split(' · ').slice(0, 8).join(' · '); r.breakdown_reasons = (r.breakdown_reasons || '').split(' · ').slice(0, 8).join(' · '); });
+    for (const [id] of COINS) if (IN[id] && (id !== 'btc' || btcFresh)) BARS[id] = IN[id].slice(-120).map((b) => [b.date, b.open, b.high, b.low, b.close]);
+    const chunks = Array.from({ length: BARCH }, () => []);
+    COINS.forEach((c, i) => chunks[i % BARCH].push(c[0]));
+    for (let k = 0; k < BARCH; k++) {
+      const body = {}; chunks[k].forEach((id) => { if (BARS[id]) body[id] = BARS[id]; });
+      await DB.doc('bars/c' + k).set({ coins: body, at });
+    }
+    const doc = { at, at8: at, summary: summarize(rows), failed: missing, dom, coins: COINS, v: 3, list: (SNAP && SNAP.list === LIST_V) || universeList ? LIST_V : (SNAP && SNAP.list) || null };
+    await writeScan(doc, rows);
+    SNAP = Object.assign({}, doc, { rows }); render(); renderStatus();
+  }
+
+  /* ---------- boot ---------- */
+  async function loadBars() {
+    const out = {};
+    for (let k = 0; k < BARCH; k++) { try { const s = await DB.doc('bars/c' + k).get(); if (s.exists) Object.assign(out, (s.data().coins) || {}); } catch (e) { /* chart only */ } }
+    BARS = out;
+  }
+  async function boot() {
+    const [db, user, mcp] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('mcp')]);
+    DB = db; MCP = mcp;
+    try { CAN_WRITE = user ? !!(await user.isOwner()) || !!(await user.canEdit()) : false; } catch (e) { CAN_WRITE = false; }
+    if (!DB) { $('main').innerHTML = '<section class="card empty"><h2>Saved scans are not available here</h2><p class="note">Open this page in claude.ai to see the last scan.</p></section>'; renderStatus(); return; }
+    renderStatus();
+    let lastAt = null, lastAt8 = null;
+    DB.doc('scan/latest').onSnapshot(async (snap) => {
+      if (RUNNING) return;
+      const head = snap.exists ? snap.data() : null;
+      if (head && (head.at !== lastAt || head.at8 !== lastAt8)) {
+        const full = await readScan(head);
+        if (full && Array.isArray(full.coins) && full.coins.length) COINS = full.coins;
+        /* a watch-list entry added since the last scan joins the list and counts as missing, so Fetch missing pulls just that one */
+        const added = WATCH.filter((w) => !COINS.some((c) => c[0] === w[0]));
+        if (added.length) { COINS = COINS.concat(added.map((w) => w.slice())); if (full) full.failed = Array.from(new Set([...(full.failed || []), ...added.map((w) => w[0])])); }
+        if (head.at !== lastAt) { lastAt = head.at; await loadBars(); }
+        if (full && Array.isArray(full.rows)) { full.rows = full.rows.filter((r) => WATCH_IDS.has(r.id)); full.summary = summarize(full.rows); }
+        lastAt8 = head.at8; SNAP = full;
+      } else if (!head) SNAP = null;
+      if (!RUNNING) render();
+      renderStatus();
+    }, () => { banner('Lost the connection to the saved scan. Reload the page.', 'bad'); });
+    DB.doc('meta/pause').onSnapshot((s) => { const u = s.exists ? +s.data().until || 0 : 0; PAUSE_UNTIL = Math.max(PAUSE_UNTIL, u); renderStatus(); }, () => { /* lock is optional */ });
+    $('refresh').addEventListener('click', () => run(null));
+    $('quick').addEventListener('click', () => quick8());
+    $('missing').addEventListener('click', () => { const ids = (SNAP && SNAP.failed) || []; run(ids); });
+    setInterval(renderStatus, 60000);
+  }
+  if (window.claude && window.claude.use) boot();
+  else $('main').innerHTML = '<section class="card empty"><h2>Saved scans are not available here</h2><p class="note">Open this page in claude.ai to see the last scan.</p></section>';
+})();
+</script>
+
+</body></html>

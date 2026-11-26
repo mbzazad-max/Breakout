@@ -1,0 +1,76 @@
+name: Build and deploy Breakout Radar
+# Rebuilds the radar from Market-Data's closed candles and deploys it to Cloudflare.
+# Market-Data starts this workflow after every import that changes a series the radar uses (Binance every 4 hours,
+# PC gauges every 4 hours); the Refresh button and a daily safety run start it too.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this run (the Refresh button fills this in)'
+        required: false
+        default: 'manual'
+      force:
+        description: 'Rebuild even if no new candles arrived'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '20 1 * * *'   # safety net once a day (12:20 Sydney summer time)
+  push:
+    branches: [main]
+    paths: ['public/index.html', 'public/shim.js', 'public/cloud.js', 'worker/**', 'build/**', 'config/**', 'tools/**', 'wrangler.jsonc', 'reference/**']
+permissions:
+  contents: write
+concurrency:
+  group: breakout
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The page must be the original artifact plus the listed edits
+        run: node tools/page.js
+      - name: 4H and 1H tiers must be the page's own 8H tier code
+        run: node tests/tiers.js
+      - name: Check secrets
+        env:
+          MD: ${{ secrets.MARKET_DATA_TOKEN }}
+        run: '[ -n "$MD" ] || { echo "::error::Secret MARKET_DATA_TOKEN is not set, so the shared data cannot be read. Nothing changed."; exit 1; }'
+      - uses: actions/checkout@v4
+        with:
+          repository: mbzazad-max/market-data
+          token: ${{ secrets.MARKET_DATA_TOKEN }}
+          path: md
+          fetch-depth: 1
+      - name: Build the scan with the page's own Refresh, on closed Market-Data candles (keeps last good data on any failure)
+        run: |
+          mkdir -p /tmp/nm && (cd /tmp/nm && npm init -y >/dev/null && npm i --no-save --silent jsdom@24)
+          node build/build.js md /tmp/nm/node_modules ${{ (inputs.force || github.event_name == 'push') && '--force' || '' }}
+          node tests/tiers.js
+      - name: Save the new scan (one commit)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/scan.json public/freshness.json
+          if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
+          git commit -q -m "Radar build $(node -p "require('./public/freshness.json').generated")"
+          for i in 1 2 3 4 5; do git push -q origin HEAD:main && exit 0; git pull -q --rebase origin main; sleep $((i*2)); done
+          echo "::error::Could not save the scan."; exit 1
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REFRESH_TOKEN: ${{ secrets.MARKET_DATA_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "::warning::Cloudflare secrets not set; built but not deployed."; exit 0; fi
+          export CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')" CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          echo "Token: ${#CLOUDFLARE_API_TOKEN} characters; account id: ${#CLOUDFLARE_ACCOUNT_ID} characters (expected 32)."
+          [ ${#CLOUDFLARE_ACCOUNT_ID} -eq 32 ] || { echo "::error::CLOUDFLARE_ACCOUNT_ID must be the 32-character Account ID. The built data is saved; the site keeps its last deploy."; exit 1; }
+          npx -y wrangler@4 deploy || { echo "::error::Cloudflare refused the deploy. Check CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. The built data is saved; the site keeps its last deploy."; exit 1; }   # workers_dev is off: only the home site reaches this Worker
+          printf '%s' "$REFRESH_TOKEN" | npx -y wrangler@4 secret put GITHUB_TOKEN
