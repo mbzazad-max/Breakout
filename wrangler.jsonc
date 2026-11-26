@@ -2,7 +2,7 @@
   // Breakout Radar on Cloudflare Workers. Static files come from public/ (built on GitHub from Market-Data).
   // No public address of its own: it is reached only through the home site (repo dashboards) at /breakout/,
   // which holds the owner-only login lock. Refresh controls stay at /api/breakout/, behind the login.
-  // Deployed by .github/workflows/build.yml (needs secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID).
+  // Deployed by .github/workflows/build.yml (needs secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID). First deploy 27 Nov 2026.
   "name": "breakout",
   "main": "worker/index.js",
   "compatibility_date": "2026-11-01",
