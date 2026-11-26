@@ -1,9 +1,9 @@
 {
- "generated": "2026-11-26 20:59 UTC",
- "inputs": "c8860f4d2b0e5b44",
+ "generated": "2026-11-26 21:16 UTC",
+ "inputs": "ed45447f6cbfe043",
  "source": "mbzazad-max/market-data",
  "failed": [],
- "last_result": "33 coins updated on 1D and 1W; 9 near a level also checked on 8H. Saved.",
+ "last_result": "44 coins updated on 1D and 1W; 12 near a level also checked on 8H. Saved.",
  "refused": [],
  "series": [
   {
@@ -173,6 +173,20 @@
    "built_from": 1795708800,
    "last_close": 1795723200,
    "rows": 5811
+  },
+  {
+   "id": "binance/ETHBTC/1H",
+   "period_s": 3600,
+   "built_from": 1795719600,
+   "last_close": 1795723200,
+   "rows": 1681
+  },
+  {
+   "id": "binance/ETHBTC/4H",
+   "period_s": 14400,
+   "built_from": 1795708800,
+   "last_close": 1795723200,
+   "rows": 20520
   },
   {
    "id": "binance/ETHUSDT/1D",
@@ -658,6 +672,62 @@
    "rows": 16842
   },
   {
+   "id": "tv/CRYPTOCAP_BTC.D/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2077
+  },
+  {
+   "id": "tv/CRYPTOCAP_BTC.D/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 1977
+  },
+  {
+   "id": "tv/CRYPTOCAP_BTC/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_BTC/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 5050
+  },
+  {
+   "id": "tv/CRYPTOCAP_MEME.C/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_MEME.C/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 3339
+  },
+  {
+   "id": "tv/CRYPTOCAP_OTHERS/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_OTHERS/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 5056
+  },
+  {
    "id": "tv/CRYPTOCAP_STABLE.C/1H",
    "period_s": 3600,
    "built_from": 1795694400,
@@ -670,6 +740,20 @@
    "built_from": 1795680000,
    "last_close": 1795694400,
    "rows": 3339
+  },
+  {
+   "id": "tv/CRYPTOCAP_TOTAL/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_TOTAL/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 5086
   },
   {
    "id": "tv/CRYPTOCAP_TOTAL2ES/1H",
@@ -686,6 +770,41 @@
    "rows": 5087
   },
   {
+   "id": "tv/CRYPTOCAP_TOTAL3ES/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_TOTAL3ES/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 5086
+  },
+  {
+   "id": "tv/CRYPTOCAP_TOTALES/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2173
+  },
+  {
+   "id": "tv/CRYPTOCAP_TOTALES/4H",
+   "period_s": 14400,
+   "built_from": 1795680000,
+   "last_close": 1795694400,
+   "rows": 5056
+  },
+  {
+   "id": "tv/CRYPTOCAP_USDC.D/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2077
+  },
+  {
    "id": "tv/CRYPTOCAP_USDC.D/4H",
    "period_s": 14400,
    "built_from": 1795680000,
@@ -693,11 +812,39 @@
    "rows": 1977
   },
   {
+   "id": "tv/CRYPTOCAP_USDT.D/1H",
+   "period_s": 3600,
+   "built_from": 1795694400,
+   "last_close": 1795698000,
+   "rows": 2077
+  },
+  {
    "id": "tv/CRYPTOCAP_USDT.D/4H",
    "period_s": 14400,
    "built_from": 1795680000,
    "last_close": 1795694400,
    "rows": 6363
+  },
+  {
+   "id": "tv/SP_SPX/1D",
+   "period_s": 86400,
+   "built_from": 1795564800,
+   "last_close": 1795651200,
+   "rows": 4020
+  },
+  {
+   "id": "tv/SP_SPX/1H",
+   "period_s": 3600,
+   "built_from": 1795638600,
+   "last_close": 1795642200,
+   "rows": 20892
+  },
+  {
+   "id": "tv/SP_SPX/4H",
+   "period_s": 14400,
+   "built_from": 1795631400,
+   "last_close": 1795645800,
+   "rows": 7752
   }
  ]
 }

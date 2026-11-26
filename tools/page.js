@@ -1,7 +1,9 @@
 /* Breakout Radar page for Cloudflare = the ORIGINAL claude.ai page (reference/index.original.html, checksummed) plus a fixed,
    counted list of edits. Nothing else changes; the scoring engine (scanAll, addOdds, the 8H tier) is untouched.
    Edits (owner, 27 Nov 2026):
-     1. Watch list: XMR, LEO, XAUT, LIT removed (no Market-Data series). 31 coins + TOTAL2ES + STABLE.C. LIST_V watch-2.
+     1. Watch list: XMR, LEO, XAUT, LIT removed (no Market-Data series); the 13 Structure Shift gauges (TOTAL2ES and STABLE.C
+        were already there; TOTAL3ES, OTHERS, TOTAL, TOTALES, BTCCAP, BTC.D, USDT.D+USDC.D, USDT.D, ETHBTC, MEME.C, SPX added).
+        31 coins + 13 gauges. LIST_V watch-3.
      2. Data-source wording: Market-Data, not TradingView (the page here never calls TradingView; GitHub runs its Refresh).
      3. 4H and 1H early-warning tiers. They are the page's own 8H tier code, copied with only the candle length,
         field prefix (h4_ / h1_) and wording changed: a closed 4H (1H) candle beyond the coin's 1D level by 0.25x ATR(14),
@@ -30,8 +32,11 @@ function rep(old, neu, count = 1) {
 /* 1. watch list */
 for (const c of ['["xmr", "XMR", "KUCOIN:XMRUSDT"], ', '["leo", "LEO", "OKX:LEOUSDT"], ', '["xaut", "XAUT", null], ', '["lit", "LIT", "BYBIT:LITUSDT"], ']) rep(c, '');
 rep('/* your fixed watch list (no screener): 35 coins', '/* your fixed watch list (no screener): 31 coins (XMR, LEO, XAUT, LIT removed 27 Nov 2026: not in Market-Data)');
-rep('Your watch list of 35 coins plus two gauges', 'Your watch list of 31 coins plus two gauges');
-rep("const LIST_V = 'watch-1';", "const LIST_V = 'watch-2';");
+rep('Your watch list of 35 coins plus two gauges, <b>TOTAL2ES</b> (the alt market cap without stablecoins, a gauge for the whole alt market) and <b>STABLE.C</b> (the total stablecoin market cap; a new index with history only from May 2025, so its weekly read rests on few candles), scored',
+  'Your watch list of 31 coins plus the 13 market gauges of your Structure Shift board: <b>TOTAL2ES</b>, <b>TOTAL3ES</b>, <b>OTHERS</b>, <b>TOTAL</b>, <b>TOTALES</b>, <b>BTCCAP</b> (Bitcoin market cap), <b>BTC.D</b>, <b>USDT.D+USDC.D</b> (stablecoin dominance, summed candle by candle), <b>USDT.D</b>, <b>ETHBTC</b>, <b>STABLE.C</b> and <b>MEME.C</b> (both new indexes with history only from May 2025, so their weekly read rests on few candles) and <b>SPX</b> (S&amp;P 500, US market hours only, so it has no 8H bars), scored');
+/* 1b. the Structure Shift gauges (owner, 27 Nov 2026): appended to the watch list */
+rep('["stablec", "STABLE.C", "CRYPTOCAP:STABLE.C"]];', '["stablec", "STABLE.C", "CRYPTOCAP:STABLE.C"], ["total3es", "TOTAL3ES", "CRYPTOCAP:TOTAL3ES"], ["others", "OTHERS", "CRYPTOCAP:OTHERS"], ["total", "TOTAL", "CRYPTOCAP:TOTAL"], ["totales", "TOTALES", "CRYPTOCAP:TOTALES"], ["btccap", "BTCCAP", "CRYPTOCAP:BTC"], ["btcd", "BTC.D", "CRYPTOCAP:BTC.D"], ["stabledom", "USDT.D+USDC.D", "CRYPTOCAP:USDT.D+USDC.D"], ["usdtd", "USDT.D", "CRYPTOCAP:USDT.D"], ["ethbtc", "ETHBTC", "BINANCE:ETHBTC"], ["memec", "MEME.C", "CRYPTOCAP:MEME.C"], ["spx", "SPX", "SP:SPX"]];');
+rep("const LIST_V = 'watch-1';", "const LIST_V = 'watch-3';");
 rep('Three stages: <b>8H</b> early warning, <b>1D</b> confirmation, <b>1W</b> trend filter.', 'Stages: <b>1H</b>, <b>4H</b> and <b>8H</b> early warnings, <b>1D</b> confirmation, <b>1W</b> trend filter.');
 
 /* 2. data-source wording */

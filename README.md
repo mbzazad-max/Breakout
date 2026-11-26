@@ -1,6 +1,7 @@
 # Breakout Radar
 
-31 coins plus TOTAL2ES and STABLE.C, scored for an upcoming breakout or breakdown: **1H, 4H and 8H** early warnings,
+31 coins plus the 13 market gauges of the Structure Shift board (TOTAL2ES, TOTAL3ES, OTHERS, TOTAL, TOTALES, BTCCAP, BTC.D,
+USDT.D+USDC.D, USDT.D, ETHBTC, STABLE.C, MEME.C, SPX), scored for an upcoming breakout or breakdown: **1H, 4H and 8H** early warnings,
 **1D** confirmation, **1W** trend filter, with chance-of-target and typical days from each coin's own history.
 
 Live (owner login): https://dashboards.mbzazad.workers.dev/breakout/
@@ -10,8 +11,9 @@ Live (owner login): https://dashboards.mbzazad.workers.dev/breakout/
   Binance, TradingView or any connector. `config/board.json` maps every request the page makes to a Market-Data series:
   - Coins: `binance/<SYM>USDT/1D`, `/4H`, `/1H` (Market-Data's own GitHub Binance fetch, every 4 hours, 7 min after each 4H close).
     8H = pairs of closed 4H candles at 00/08/16 UTC. The daily answer ends with today so far, built from today's closed 4H candles.
-  - Gauges: `tv/CRYPTOCAP_TOTAL2ES`, `tv/CRYPTOCAP_STABLE.C` (4H, 1H; days from 4H), `tv/CRYPTOCAP_USDT.D` + `USDC.D` (8H from 4H),
-    uploaded from the owner's PC every 4 hours.
+  - Gauges (added 27 Nov 2026, same 13 as Structure Shift): `tv/CRYPTOCAP_*` 4H and 1H (days and 8H from 4H), USDT.D+USDC.D summed
+    candle by candle, ETHBTC from `binance/ETHBTC` 4H/1H, SPX from `tv/SP_SPX` 1D/4H/1H (exchange hours, no 8H).
+    The TradingView gauges came from the owner's PC; that upload was switched off 26 Nov 2026, so they are frozen until a new source.
   - Removed 27 Nov 2026 (no Market-Data series): XMR, LEO, XAUT, LIT.
 - **Build**: `.github/workflows/build.yml` runs when Market-Data imports a series the radar uses (dispatched by Market-Data, see its
   `dashboards.json`), on the Refresh button, daily at 01:20 UTC and on pushes. `build/build.js` runs the page in jsdom

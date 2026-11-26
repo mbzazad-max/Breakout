@@ -1,5 +1,5 @@
 {
- "_about": "Which Market-Data series (mbzazad-max/market-data) answers each TradingView request the page's own Refresh makes (symbol -> interval -> series). 'A>1D' = UTC days built from 4H (a day counts once its 20:00 candle has closed); 'A>8H' = 8H candles from 4H pairs at 00/08/16 UTC (both halves needed). Closed candles only. No TradingView calls are made by this repo. Removed coins (no Market-Data series, 27 Nov 2026): XMR, LEO, XAUT, LIT.",
+ "_about": "Which Market-Data series (mbzazad-max/market-data) answers each TradingView request the page's own Refresh makes (symbol -> interval -> series). 'A>1D' = UTC days built from 4H (a day counts once its 20:00 candle has closed); 'A>8H' = 8H candles from 4H pairs at 00/08/16 UTC (both halves needed). 'A+B' = two series added candle by candle. Daily answers end with today so far from today's closed 4H candles. session_series keep exchange-hours candle times (SPX, no 8H). Closed candles only. No TradingView calls are made by this repo. Removed coins (no Market-Data series, 27 Nov 2026): XMR, LEO, XAUT, LIT. Gauges = the 13 on the Structure Shift board (added 27 Nov 2026).",
  "sources": {
   "BINANCE:BTCUSDT": {
    "1D": "binance/BTCUSDT/1D",
@@ -200,10 +200,77 @@
    "60": "tv/CRYPTOCAP_STABLE.C/1H"
   },
   "CRYPTOCAP:USDT.D": {
-   "480": "tv/CRYPTOCAP_USDT.D/4H>8H"
+   "1D": "tv/CRYPTOCAP_USDT.D/4H>1D",
+   "480": "tv/CRYPTOCAP_USDT.D/4H>8H",
+   "240": "tv/CRYPTOCAP_USDT.D/4H",
+   "60": "tv/CRYPTOCAP_USDT.D/1H"
   },
   "CRYPTOCAP:USDC.D": {
    "480": "tv/CRYPTOCAP_USDC.D/4H>8H"
+  },
+  "CRYPTOCAP:TOTAL3ES": {
+   "1D": "tv/CRYPTOCAP_TOTAL3ES/4H>1D",
+   "480": "tv/CRYPTOCAP_TOTAL3ES/4H>8H",
+   "240": "tv/CRYPTOCAP_TOTAL3ES/4H",
+   "60": "tv/CRYPTOCAP_TOTAL3ES/1H"
+  },
+  "CRYPTOCAP:OTHERS": {
+   "1D": "tv/CRYPTOCAP_OTHERS/4H>1D",
+   "480": "tv/CRYPTOCAP_OTHERS/4H>8H",
+   "240": "tv/CRYPTOCAP_OTHERS/4H",
+   "60": "tv/CRYPTOCAP_OTHERS/1H"
+  },
+  "CRYPTOCAP:TOTAL": {
+   "1D": "tv/CRYPTOCAP_TOTAL/4H>1D",
+   "480": "tv/CRYPTOCAP_TOTAL/4H>8H",
+   "240": "tv/CRYPTOCAP_TOTAL/4H",
+   "60": "tv/CRYPTOCAP_TOTAL/1H"
+  },
+  "CRYPTOCAP:TOTALES": {
+   "1D": "tv/CRYPTOCAP_TOTALES/4H>1D",
+   "480": "tv/CRYPTOCAP_TOTALES/4H>8H",
+   "240": "tv/CRYPTOCAP_TOTALES/4H",
+   "60": "tv/CRYPTOCAP_TOTALES/1H"
+  },
+  "CRYPTOCAP:BTC": {
+   "1D": "tv/CRYPTOCAP_BTC/4H>1D",
+   "480": "tv/CRYPTOCAP_BTC/4H>8H",
+   "240": "tv/CRYPTOCAP_BTC/4H",
+   "60": "tv/CRYPTOCAP_BTC/1H"
+  },
+  "CRYPTOCAP:BTC.D": {
+   "1D": "tv/CRYPTOCAP_BTC.D/4H>1D",
+   "480": "tv/CRYPTOCAP_BTC.D/4H>8H",
+   "240": "tv/CRYPTOCAP_BTC.D/4H",
+   "60": "tv/CRYPTOCAP_BTC.D/1H"
+  },
+  "CRYPTOCAP:MEME.C": {
+   "1D": "tv/CRYPTOCAP_MEME.C/4H>1D",
+   "480": "tv/CRYPTOCAP_MEME.C/4H>8H",
+   "240": "tv/CRYPTOCAP_MEME.C/4H",
+   "60": "tv/CRYPTOCAP_MEME.C/1H"
+  },
+  "CRYPTOCAP:USDT.D+USDC.D": {
+   "1D": "tv/CRYPTOCAP_USDT.D/4H+tv/CRYPTOCAP_USDC.D/4H>1D",
+   "480": "tv/CRYPTOCAP_USDT.D/4H+tv/CRYPTOCAP_USDC.D/4H>8H",
+   "240": "tv/CRYPTOCAP_USDT.D/4H+tv/CRYPTOCAP_USDC.D/4H",
+   "60": "tv/CRYPTOCAP_USDT.D/1H+tv/CRYPTOCAP_USDC.D/1H"
+  },
+  "BINANCE:ETHBTC": {
+   "1D": "binance/ETHBTC/4H>1D",
+   "480": "binance/ETHBTC/4H>8H",
+   "240": "binance/ETHBTC/4H",
+   "60": "binance/ETHBTC/1H"
+  },
+  "SP:SPX": {
+   "1D": "tv/SP_SPX/1D",
+   "240": "tv/SP_SPX/4H",
+   "60": "tv/SP_SPX/1H",
+   "480": "none"
   }
- }
+ },
+ "session_series": [
+  "tv/SP_SPX/4H",
+  "tv/SP_SPX/1H"
+ ]
 }

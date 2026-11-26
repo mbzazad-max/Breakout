@@ -3,6 +3,8 @@
      config/board.json maps each page request (symbol + interval) to a Market-Data series:
        binance/<SYM>/1D, /4H, /1H as stored; '<series>/4H>1D' = UTC days from 4H (a day counts once its 20:00 candle closed);
        '<series>/4H>8H' = 8H candles from 4H pairs at 00/08/16 UTC (both halves needed).
+       'A+B' = two series added candle by candle (USDT.D+USDC.D, as on Structure Shift).
+       session_series (SPX) keep their exchange-hours candle times; 'none' = no such candles on purpose (SPX 8H).
      Daily answers end with today so far, built from today's closed 4H candles (the page treats its last daily bar as the
      open day, as it was with TradingView); every other candle is a closed Market-Data candle.
    Closed candles only; a series that is unclosed, out of order or has a 50% jump is refused and that request fails in the
@@ -42,21 +44,33 @@ function group(rows, span, need, lastStart) {          // merge 4H rows into `sp
   }
   return out;
 }
+function sum(ids) {                                   // 'A+B': the two series added candle by candle (times both have)
+  const parts = ids.map((id) => { const r = load(id); if (!r) throw new Error(id + ' is not in Market-Data'); return r; });
+  const maps = parts.slice(1).map((r) => new Map(r.map((x) => [x.t, x])));
+  return parts[0].filter((x) => maps.every((m) => m.has(x.t))).map((x) => {
+    const o = maps.map((m) => m.get(x.t));
+    return { t: x.t, o: x.o + o.reduce((a, y) => a + y.o, 0), h: x.h + o.reduce((a, y) => a + y.h, 0), l: x.l + o.reduce((a, y) => a + y.l, 0), c: x.c + o.reduce((a, y) => a + y.c, 0), v: (x.v || 0) + o.reduce((a, y) => a + (y.v || 0), 0) };
+  });
+}
+const parts = (base) => base.split('+');
 function series(spec) {                               // -> {rows, base, period}
   const [base, conv] = spec.split('>');
-  const rows = load(base);
+  const rows = base.includes('+') ? sum(parts(base)) : load(base);
   if (!rows) throw new Error(base + ' is not in Market-Data');
-  if (!conv) return { rows, base, period: SEC[base.split('/')[2]], today: base.endsWith('/1D') ? base.replace(/1D$/, '4H') : null };
+  if (base.includes('+') && !cache[base]) cache[base] = rows;
+  const tf = parts(base)[0].split('/')[2];
+  if (!conv) return { rows, base, period: SEC[tf], today: base.endsWith('/1D') ? base.replace(/1D$/, '4H') : null };
   if (conv === '1D') return { rows: group(rows, 86400, 6, 72000), base, period: 86400, today: base };
   if (conv === '8H') return { rows: group(rows, 28800, 2, 14400), base, period: 28800 };
   throw new Error('unknown conversion ' + conv);
 }
-function check(rows, period) {
+const SESSION = new Set(cfg.session_series || []);   // exchange-hours series (SPX): candles start at the session open
+function check(rows, period, base) {
   if (!rows || !rows.length) throw new Error('no candles yet');
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (!Number.isFinite(r.t) || !Number.isFinite(r.c) || r.c <= 0) throw new Error('bad value at ' + iso(r.t));
-    if (r.t % period !== 0) throw new Error('candle off its time grid at ' + iso(r.t));
+    if (r.t % period !== 0 && !SESSION.has(base)) throw new Error('candle off its time grid at ' + iso(r.t));
     if (i && r.t <= rows[i - 1].t) throw new Error('candles out of order at ' + iso(r.t));
     if (r.t + period > NOW) throw new Error('candle not closed yet at ' + iso(r.t));
   }
@@ -68,22 +82,25 @@ function check(rows, period) {
 const candles = {}, used = new Map(), problems = [];
 for (const [sym, ivs] of Object.entries(cfg.sources)) {
   for (const [iv, spec] of Object.entries(ivs)) {
+    if (spec === 'none') { candles[sym + '|' + iv] = []; continue; }   // no such candles on purpose: the page shows "No 8H data"
     try {
       const s = series(spec);
-      const rows = check(s.rows, s.period).slice(-1000);
+      const rows = check(s.rows, s.period, s.base).slice(-1000);
       // today so far: the page's daily request always ended with the open day (TradingView did); here it is built from
       // today's CLOSED 4H candles only, so every price in it is a closed candle (same as Cycle Map's today_from_4h)
       if (iv === '1D' && s.today) {
-        const h4 = load(s.today) || [], day = rows[rows.length - 1].t + 86400, part = h4.filter((r) => r.t >= day && r.t < day + 86400 && r.t + 14400 <= NOW);
+        const h4 = (s.today.includes('+') ? sum(parts(s.today)) : load(s.today)) || [], day = rows[rows.length - 1].t + 86400, part = h4.filter((r) => r.t >= day && r.t < day + 86400 && r.t + 14400 <= NOW);
         if (part.length && part.length < 6) rows.push({ t: day, o: part[0].o, h: Math.max(...part.map((r) => r.h)), l: Math.min(...part.map((r) => r.l)), c: part[part.length - 1].c, v: part.reduce((a, r) => a + (r.v || 0), 0) });
       }
       candles[sym + '|' + iv] = rows;
-      const raw = load(s.base), p = SEC[s.base.split('/')[2]];
-      used.set(s.base, { id: s.base, period_s: p, built_from: raw[raw.length - 1].t, last_close: raw[raw.length - 1].t + p, rows: raw.length });
+      for (const id of parts(s.base)) {
+        const raw = load(id), p = SEC[id.split('/')[2]];
+        used.set(id, { id, period_s: p, built_from: raw[raw.length - 1].t, last_close: raw[raw.length - 1].t + p, rows: raw.length });
+      }
     } catch (e) {
       candles[sym + '|' + iv] = { error: e.message };
       problems.push(`${sym} ${iv}: ${e.message}`);
-      if (!used.has(spec.split('>')[0])) used.set(spec.split('>')[0], { id: spec.split('>')[0], period_s: SEC[spec.split('>')[0].split('/')[2]] || 0, last_close: null });
+      for (const id of parts(spec.split('>')[0])) if (!used.has(id)) used.set(id, { id, period_s: SEC[id.split('/')[2]] || 0, last_close: null });
     }
   }
 }
