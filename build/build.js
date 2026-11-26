@@ -79,7 +79,7 @@ for (const [sym, ivs] of Object.entries(cfg.sources)) {
       }
       candles[sym + '|' + iv] = rows;
       const raw = load(s.base), p = SEC[s.base.split('/')[2]];
-      used.set(s.base, { id: s.base, period_s: p, last_close: raw[raw.length - 1].t + p });
+      used.set(s.base, { id: s.base, period_s: p, built_from: raw[raw.length - 1].t, last_close: raw[raw.length - 1].t + p, rows: raw.length });
     } catch (e) {
       candles[sym + '|' + iv] = { error: e.message };
       problems.push(`${sym} ${iv}: ${e.message}`);
