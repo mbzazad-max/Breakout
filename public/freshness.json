@@ -1,6 +1,6 @@
 {
- "generated": "2026-11-28 01:37 UTC",
- "inputs": "b8b86f1d2c49e5ee",
+ "generated": "2026-11-28 01:49 UTC",
+ "inputs": "fdee03826abe44fc",
  "source": "mbzazad-max/market-data",
  "failed": [],
  "last_result": "44 coins updated on 1D and 1W; 11 near a level also checked on 8H. Saved.",
@@ -842,9 +842,9 @@
   {
    "id": "tv/SP_SPX/4H",
    "period_s": 14400,
-   "built_from": 1795631400,
-   "last_close": 1795645800,
-   "rows": 7752
+   "built_from": 1795804200,
+   "last_close": 1795818600,
+   "rows": 7754
   }
  ]
 }
